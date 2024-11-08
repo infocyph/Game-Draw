@@ -11,7 +11,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "Infocyph\\Draw\\": "src/Draw/"
+            "Infocyph\\Draw\\": "src/"
         }
     },
     "require": {

@@ -1,4 +1,5 @@
 <?php
+
 use Infocyph\Draw\FlexibleDraw;
 
 beforeEach(function () {

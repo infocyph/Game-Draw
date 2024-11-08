@@ -1,4 +1,5 @@
 <?php
+
 use Infocyph\Draw\LuckyDraw;
 
 beforeEach(function () {
