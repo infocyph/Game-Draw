@@ -1,9 +1,8 @@
 {
-    "name": "abmmhasan/game-draw",
+    "name": "infocyph/game-draw",
     "description": "Generates Item and Item count for winners.",
     "type": "library",
     "license": "MIT",
-    "homepage": "https://abmmhasan.github.io/Lucky-Draw/",
     "authors": [
         {
             "name": "abmmhasan",
@@ -12,7 +11,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "AbmmHasan\\Draw\\": "src/Draw/"
+            "Infocyph\\Draw\\": "src/Draw/"
         }
     },
     "require": {
@@ -20,6 +19,42 @@
         "ext-bcmath": "*"
     },
     "require-dev": {
-        "symfony/var-dumper": "^6.3"
+        "captainhook/captainhook": "^5.23",
+        "laravel/pint": "^1.18",
+        "pestphp/pest": "^3.5",
+        "rector/rector": "^1.2",
+        "symfony/var-dumper": "^7.1"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test:code": "pest --parallel --processes=10",
+        "test:refactor": "rector process --dry-run",
+        "test:lint": "pint --test",
+        "test:hook": [
+            "captainhook hook:post-checkout",
+            "captainhook hook:pre-commit",
+            "captainhook hook:post-commit",
+            "captainhook hook:post-merge",
+            "captainhook hook:post-rewrite",
+            "captainhook hook:pre-push"
+        ],
+        "tests": [
+            "@test:code",
+            "@test:lint",
+            "@test:refactor"
+        ],
+        "git:hook": "captainhook install --only-enabled -nf",
+        "test": "pest",
+        "refactor": "rector process",
+        "lint": "pint",
+        "post-autoload-dump": "@git:hook"
     }
 }

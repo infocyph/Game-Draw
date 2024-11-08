@@ -1,4 +1,5 @@
+vendor
 .idea
-/vendor
 composer.lock
-example.php
+git-story_media
+test.php

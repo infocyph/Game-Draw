@@ -1,19 +1,23 @@
-name: "Stability Test"
+name: "Security & Standards"
 
 on:
+  schedule:
+    - cron: '0 0 * * 0'
   push:
     branches: [ '*' ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master", "develop" ]
 
 jobs:
-  build:
+  run:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
         operating-system: [ ubuntu-latest ]
-        php-versions: [ '8.0', '8.1', '8.2', '8.3' ]
-    name: PHP ${{ matrix.php-versions }} Test on ${{ matrix.operating-system }}
+        php-versions: [ '8.2', '8.3' ]
+        dependency-version: [ prefer-lowest, prefer-stable ]
+
+    name: PHP ${{ matrix.php-versions }} - ${{ matrix.operating-system }} - ${{ matrix.dependency-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,3 +40,6 @@ jobs:
 
       - name: Package Audit
         run: composer audit
+
+      - name: Test
+        run: composer tests

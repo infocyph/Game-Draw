@@ -162,26 +162,25 @@ Example Output:
 
 ### 3. FlexibleDraw
 
-The `FlexibleDraw` class provides a versatile approach to selection, offering various types of draw methods, including probability-based, elimination, round-robin, time-based, and more. This flexibility allows for customized and dynamic draws, suitable for a range of applications.
+The `FlexibleDraw` class offers a versatile approach to draws, supporting various types of selection methods, including probability-based, elimination, round-robin, and more. This flexibility allows for customized and dynamic but basic draws.
 
 #### Supported Draw Types
-- **Probability Draw**: Selects items based on assigned probability weights.
-- **Elimination Draw**: Items are drawn and removed from the selection pool, ensuring no repeats.
-- **Weighted Elimination Draw**: Similar to Elimination Draw, but selections are weighted.
-- **Round Robin Draw**: Items are selected in a round-robin sequence, cycling through each item.
-- **Cumulative Draw**: Draws items based on cumulative scores, with higher scores increasing selection probability.
-- **Batched Draw**: Draws a specified number of items in one call, with or without replacement.
-- **Time-Based Weighted Draw**: Selects items based on weight and a specified time interval, e.g., daily or weekly.
-- **Weighted Batch Draw**: Draws a batch of items using weighted probabilities.
-- **Sequential Draw**: Draws items in a fixed sequence, restarting once all items are drawn.
-- **Range Weighted Draw**: Selects a random number within a defined range, weighted by probability.
+- **Probability Draw**: Selects items based on their assigned probability weights.
+- **Elimination Draw**: Items are drawn and removed from the selection pool, preventing repeated selection.
+- **Round Robin Draw**: Items are selected in a round-robin sequence, ensuring each item is chosen before repeating.
+- **Cumulative Draw**: Draws items based on cumulative weights, adjusting probabilities over time.
+- **Batched Draw**: Draws a specified batch of items, with or without replacement.
+- **Time-Based Draw**: Selects items based on time intervals or frequency criteria.
+- **Weighted Batch Draw**: Draws a batch of items based on weighted probabilities.
+- **Group Draw**: Selects items from within specific groups.
+- **Sequential Draw**: Draws items in a predefined sequential order.
+- **Range Weighted Draw**: Selects items based on a specified range with a weighted probability.
 
-#### FlexibleDraw Options and Usage Examples
-
-Below are usage examples for each draw type. Define your items array based on the draw type requirements.
+#### FlexibleDraw Options
 
 1. **Probability Draw**:
-    - Selects items based on weighted probabilities. Higher-weight items have a greater likelihood of selection.
+    - Selects items based on weighted probabilities, allowing higher-weight items to be more likely chosen.
+
    ```php
    $items = [
        ['name' => 'item1', 'weight' => 10],
@@ -189,8 +188,18 @@ Below are usage examples for each draw type. Define your items array based on th
    ];
    ```
 
-2. **Elimination Draw**:
-    - Items are drawn once, removed from the pool after selection.
+2. **Weighted Elimination Draw**:
+    - Items are selected and removed from the pool, ensuring each item is chosen only once.
+
+   ```php
+   $items = [
+       ['name' => 'item1', 'weight' => 10],
+       ['name' => 'item2', 'weight' => 20],
+   ];
+
+3. **Elimination Draw**:
+    - Items are selected and removed from the pool, ensuring each item is chosen only once.
+
    ```php
    $items = [
        ['name' => 'item1'],
@@ -198,17 +207,9 @@ Below are usage examples for each draw type. Define your items array based on th
    ];
    ```
 
-3. **Weighted Elimination Draw**:
-    - Similar to elimination, but uses weights to influence item selection.
-   ```php
-   $items = [
-       ['name' => 'item1', 'weight' => 10],
-       ['name' => 'item2', 'weight' => 20],
-   ];
-   ```
-
 4. **Round Robin Draw**:
-    - Cycles through items in a round-robin sequence.
+    - Items are selected sequentially in a round-robin pattern.
+
    ```php
    $items = [
        ['name' => 'item1'],
@@ -217,7 +218,8 @@ Below are usage examples for each draw type. Define your items array based on th
    ```
 
 5. **Cumulative Draw**:
-    - Draws items based on cumulative scores, with selection probabilities adjusted over time.
+    - Draws items based on cumulative weights, with probabilities adjusting dynamically.
+
    ```php
    $items = [
        ['name' => 'item1'],
@@ -226,7 +228,8 @@ Below are usage examples for each draw type. Define your items array based on th
    ```
 
 6. **Batched Draw**:
-    - Draws a batch of items in one call, with optional replacement.
+    - Draws a batch of items in one call, with options for replacement. If replacement is enabled, same items will/can be drawn multiple times.
+
    ```php
    $items = [
        ['name' => 'item1'],
@@ -234,8 +237,9 @@ Below are usage examples for each draw type. Define your items array based on th
    ];
    ```
 
-7. **Time-Based Weighted Draw**:
-    - Selects items based on weight and a specified time interval (e.g., daily or weekly).
+7. **Time-Based Draw**:
+    - Draws items based on specified time intervals or conditions.
+
    ```php
    $items = [
        ['name' => 'item1', 'weight' => 10, 'time' => 'daily'],
@@ -244,7 +248,8 @@ Below are usage examples for each draw type. Define your items array based on th
    ```
 
 8. **Weighted Batch Draw**:
-    - Draws a batch of items using weighted probabilities, balancing selections by item weight.
+    - Draws a batch of items using weighted probabilities, balancing selection based on item weights.
+
    ```php
    $items = [
        ['name' => 'item1', 'weight' => 10],
@@ -253,7 +258,8 @@ Below are usage examples for each draw type. Define your items array based on th
    ```
 
 9. **Sequential Draw**:
-    - Selects items in a predefined sequence.
+    - Selects items in a fixed, sequential order, ideal for draws that require strict ordering.
+
    ```php
    $items = [
        ['name' => 'item1'],
@@ -262,37 +268,40 @@ Below are usage examples for each draw type. Define your items array based on th
    ```
 
 10. **Range Weighted Draw**:
-    - Specifies a range for each item using `min`, `max`, and `weight`.
-    ```php
-    $items = [
-        ['name' => 'item1', 'min' => 1, 'max' => 50, 'weight' => 10],
-        ['name' => 'item2', 'min' => 5, 'max' => 25, 'weight' => 15],
-    ];
-    ```
+- Specifies a range for each item using `min`, `max`, and `weight` values.
+- Ensures `min` is less than `max` for valid selection.
+
+```php
+$items = [
+    ['name' => 'item1', 'min' => 1, 'max' => 50, 'weight' => 10],
+    ['name' => 'item2', 'min' => 5, 'max' => 25, 'weight' => 15],
+];
+```
 
 #### Usage
 
-To use the `FlexibleDraw` class, create an instance with your items array and specify the draw type in the `draw` method:
-
 ```php
-$flexibleDraw = new FlexibleDraw($items);
-$result = $flexibleDraw->draw('drawType'); // Replace 'drawType' with the desired draw type, e.g., 'probability'
+$flexibleDraw = new AbmmHasan\Draw\FlexibleDraw($items);
+$result = $flexibleDraw->draw();
 ```
 
 ### Example Output
 
-The output depends on the draw type and item configuration. For example, a probability draw with weights might yield:
+Based on the selected draw type, the output will provide details on the chosen item, including any range, group, or other specifications:
 
 ```php
 [
-    'item' => 'item2',
-    'weight' => 20,
+    'item' => 'item1',
+    'weight' => 10,
+    'group' => 'groupA'
 ]
 ```
 
 ### FlexibleDraw Configuration Summary
 
-The `FlexibleDraw` class is highly adaptable, supporting various selection methods and configurations such as `weight`, `group`, `min`, `max`, and `time`. Ideal for applications needing nuanced and dynamic draws, it is more versatile than simpler draw mechanisms but optimized for manageable volumes.
+The `FlexibleDraw` class can adapt to various selection methods, supporting custom configurations with properties like `weight`, `group`, `min`, `max`, and more. This class is ideal for applications that require nuanced, dynamic draw methods beyond basic random selection but not complex as Lucky Draw or high volume as Grand Draw.
+
+---
 
 ## Support
 

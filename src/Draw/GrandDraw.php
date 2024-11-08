@@ -1,6 +1,6 @@
 <?php
 
-namespace AbmmHasan\Draw;
+namespace Infocyph\Draw;
 
 use Exception;
 use SplFileObject;
@@ -20,8 +20,8 @@ class GrandDraw
      */
     public function setUserListFilePath(string $userListFilePath): GrandDraw
     {
-        if (!file_exists($userListFilePath)) {
-            throw new Exception('File not found');
+        if (!is_readable($userListFilePath)) {
+            throw new Exception('File not found or not readable');
         }
         $this->userListFilePath = new SplFileObject($userListFilePath);
         $this->userListFilePath->setFlags(SplFileObject::READ_CSV);
@@ -49,7 +49,7 @@ class GrandDraw
      */
     public function getWinners(int $retryCount = 10): array
     {
-        $line = $this->getLineCount($this->userListFilePath->getRealPath());
+        $line = $this->getLineCount($this->userListFilePath->getRealPath()) + 1;
         $selectedWinners = [];
         foreach ($this->items as $item => $count) {
             $selectedWinners[$item] = $this->draw($count, $line, $retryCount);
@@ -71,20 +71,28 @@ class GrandDraw
         $failCount = 0;
         $seekMax = $lineCount - 1;
         $winners = [];
-        for ($i = 0; $i < $pickCount; $i++) {
+        $pickCount = min($pickCount, $lineCount - count($this->selected));
+
+        while (count($winners) < $pickCount && $failCount < $retryCount) {
             $line = random_int(0, $seekMax);
+            if (($failCount + 1) === $retryCount) {
+
+            }
+            if (isset($this->selected[$line])) {
+                $failCount++;
+                continue;
+            }
             $this->userListFilePath->seek($line);
             $id = $this->userListFilePath->fgetcsv()[0];
-            if (!in_array($id, $this->selected)) {
-                $this->selected[] = $winners[] = $id;
+
+            if ($id && !in_array($id, $this->selected, true)) {
+                $this->selected[$line] = $winners[] = $id;
                 $failCount = 0;
                 continue;
             }
-            $pickCount++;
-            if (++$failCount > $retryCount) {
-                break;
-            }
+            $failCount++;
         }
+
         return $winners;
     }
 
@@ -98,14 +106,17 @@ class GrandDraw
      */
     private function getLineCount(string $filePath): int
     {
-        switch (PHP_OS_FAMILY) {
-            case 'Darwin':
-            case 'Linux':
-                exec("wc -l $filePath", $lineCount);
-                break;
-            default:
-                exec('type "' . $filePath . '" | find /v /c ""', $lineCount);
+        $command = escapeshellarg($filePath);
+
+        match (PHP_OS_FAMILY === 'Windows' && !getenv('SHELL')) {
+            true => exec("type $command | find /v /c \"\"", $lineCount, $returnVar),
+            default => exec("wc -l $command", $lineCount, $returnVar),
+        };
+
+        if ($returnVar !== 0 || empty($lineCount)) {
+            throw new Exception("Error retrieving line count for file: $filePath");
         }
+
         return (int)strtok($lineCount[0], " ");
     }
 }

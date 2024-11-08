@@ -9,9 +9,8 @@ use UnexpectedValueException;
 
 class LuckyDraw
 {
-    public function __construct(private array $items)
-    {
-    }
+
+    public function __construct(private array $items) {}
 
     /**
      * Validates the items array.
@@ -25,7 +24,7 @@ class LuckyDraw
             throw new LengthException('Items array must contain at least one item.');
         }
 
-        $requiredKeys = ['item' => true, 'chances' => true, 'amounts' => true];
+        $requiredKeys = array_flip(['item', 'chances', 'amounts']);
         foreach ($this->items as $index => $item) {
             $missingKeys = array_diff_key($requiredKeys, $item);
             if (!empty($missingKeys)) {
@@ -90,10 +89,8 @@ class LuckyDraw
         $max <= $min && throw new UnexpectedValueException('Maximum value should be greater than minimum.');
         $bias <= 0 && throw new UnexpectedValueException('Bias should be greater than 0.');
         return max(
-            min(
-                round($min + lcg_value() ** $bias * ($max - $min + 1), $this->getFractionLength([$min, $max])),
-                $max
-            ),
+            min(round($min + pow(lcg_value(), $bias) * ($max - $min + 1), $this->getFractionLength([$min, $max])),
+                $max),
             $min,
         );
     }
@@ -164,7 +161,7 @@ class LuckyDraw
     private function multiply(array $items, int $length): array
     {
         $multiplier = 10 ** $length;
-        return array_map(fn ($value) => (int)bcmul((string)$value, (string)$multiplier), $items);
+        return array_map(fn($value) => (int)bcmul((string)$value, (string)$multiplier), $items);
     }
 
     /**

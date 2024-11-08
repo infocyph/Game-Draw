@@ -1,0 +1,13 @@
+# Exclude unnecessary files from exports
+tests export-ignore
+docs export-ignore
+.github export-ignore
+.readthedocs.yaml export-ignore
+captainhook.json export-ignore
+phpunit.xml export-ignore
+pint.json export-ignore
+rector.php export-ignore
+.gitattributes export-ignore
+
+# Enforce LF
+*  text eol=lf
