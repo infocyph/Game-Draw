@@ -72,12 +72,10 @@ class GrandDraw
         $seekMax = $lineCount - 1;
         $winners = [];
         $pickCount = min($pickCount, $lineCount - count($this->selected));
+        $pickedCount = 0;
 
-        while (count($winners) < $pickCount && $failCount < $retryCount) {
+        while ($pickedCount < $pickCount && $failCount < $retryCount) {
             $line = random_int(0, $seekMax);
-            if (($failCount + 1) === $retryCount) {
-
-            }
             if (isset($this->selected[$line])) {
                 $failCount++;
                 continue;
@@ -87,6 +85,7 @@ class GrandDraw
 
             if ($id && !in_array($id, $this->selected, true)) {
                 $this->selected[$line] = $winners[] = $id;
+                $pickedCount++;
                 $failCount = 0;
                 continue;
             }
