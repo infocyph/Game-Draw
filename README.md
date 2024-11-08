@@ -1,18 +1,18 @@
 # Game Draw
 
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/56e7f49275dc4042b67d53b4209b193d)](https://www.codacy.com/gh/abmmhasan/Game-Draw/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=abmmhasan/Game-Draw&amp;utm_campaign=Badge_Grade)
-![Libraries.io dependency status for GitHub repo](https://img.shields.io/librariesio/github/abmmhasan/game-draw)
-![Packagist Downloads](https://img.shields.io/packagist/dt/abmmhasan/game-draw)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/1d04992efafe4aeca3c3b14be7476a50)](https://app.codacy.com/gh/infocyph/Game-Draw/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+![Libraries.io dependency status for GitHub repo](https://img.shields.io/librariesio/github/infocyph/game-draw)
+![Packagist Downloads](https://img.shields.io/packagist/dt/infocyph/game-draw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-![Packagist Version](https://img.shields.io/packagist/v/abmmhasan/game-draw)
-![Packagist PHP Version Support](https://img.shields.io/packagist/php-v/abmmhasan/game-draw)
-![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/abmmhasan/game-draw)
+![Packagist Version](https://img.shields.io/packagist/v/infocyph/game-draw)
+![Packagist PHP Version Support](https://img.shields.io/packagist/php-v/infocyph/game-draw)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/infocyph/game-draw)
 
+The **Game Draw** library provides flexible and varied methods for selecting winners based on different types of draws,
+**Lucky Draw**, **Grand Draw**, and a customizable **Flexible Draw** to meet a range of requirements.
 
-The **Game Draw** library provides flexible and varied methods for selecting winners based on different types of draws, **Lucky Draw**, **Grand Draw**, and a customizable **Flexible Draw** to meet a range of requirements.
-
-> Please don't use this to generate things/prizes with People's hard-earned money. It is intended to make things fun with bonus gifts only.
-
+> Please don't use this to generate things/prizes with People's hard-earned money. It is intended to make things fun
+> with bonus gifts only.
 
 ## Prerequisites
 
@@ -24,6 +24,7 @@ The **Game Draw** library provides flexible and varied methods for selecting win
 ```
 composer require infocyph/game-draw
 ```
+
 ## Overview
 
 ### 1. LuckyDraw
@@ -74,13 +75,13 @@ $products = [
 - **item**: Provide your item's unique identifier
 
 - **chances**: Weight of item (Float/Int).
-    - It will be compared along all the items in array. 
+    - It will be compared along all the items in array.
     - The higher the chances the greater the chances of getting the item.
     - In case of active inventory you can pass available item stock here
-    
+
 - **amounts**: String or Array of Item amount (Float/Int). It can be any like:
     - (array) Single Positive value, i.e. [ 1 ] or Multiple Positive value (randomly picked), i.e. [ 1, 2, 3, 5]
-    - (array) Weighted amount, i.e.    
+    - (array) Weighted amount, i.e.
         ```php
         [
             5 => 100,
@@ -90,9 +91,9 @@ $products = [
         ]
         ```
     - (String) Weighted CSV formatted range (min,max,bias) ```'1,10.00001,0.001'```
-      - Only 3 members allowed in CSV format **min,max,bias**
-      - Max should be greater than or equal to min, bias should be greater than 0
-      - The higher the bias, the more the chance to pick the lowest amount
+        - Only 3 members allowed in CSV format **min,max,bias**
+        - Max should be greater than or equal to min, bias should be greater than 0
+        - The higher the bias, the more the chance to pick the lowest amount
 
 #### Usage
 
@@ -110,7 +111,8 @@ Example Output:
 ]
 ```
 
-> Inventory Solutions: Available stock should be passed (after subtracting used amount from stock amount) in chances properly.
+> Inventory Solutions: Available stock should be passed (after subtracting used amount from stock amount) in chances
+> properly.
 
 ### 2. GrandDraw
 
@@ -162,9 +164,12 @@ Example Output:
 
 ### 3. FlexibleDraw
 
-The `FlexibleDraw` class provides a versatile approach to selection, offering various types of draw methods, including probability-based, elimination, round-robin, time-based, and more. This flexibility allows for customized and dynamic draws, suitable for a range of applications.
+The `FlexibleDraw` class provides a versatile approach to selection, offering various types of draw methods, including
+probability-based, elimination, round-robin, time-based, and more. This flexibility allows for customized and dynamic
+draws, suitable for a range of applications.
 
 #### Supported Draw Types
+
 - **Probability Draw**: Selects items based on assigned probability weights.
 - **Elimination Draw**: Items are drawn and removed from the selection pool, ensuring no repeats.
 - **Weighted Elimination Draw**: Similar to Elimination Draw, but selections are weighted.
@@ -272,7 +277,8 @@ Below are usage examples for each draw type. Define your items array based on th
 
 #### Usage
 
-To use the `FlexibleDraw` class, create an instance with your items array and specify the draw type in the `draw` method:
+To use the `FlexibleDraw` class, create an instance with your items array and specify the draw type in the `draw`
+method:
 
 ```php
 $flexibleDraw = new FlexibleDraw($items);
@@ -292,7 +298,9 @@ The output depends on the draw type and item configuration. For example, a proba
 
 ### FlexibleDraw Configuration Summary
 
-The `FlexibleDraw` class is highly adaptable, supporting various selection methods and configurations such as `weight`, `group`, `min`, `max`, and `time`. Ideal for applications needing nuanced and dynamic draws, it is more versatile than simpler draw mechanisms but optimized for manageable volumes.
+The `FlexibleDraw` class is highly adaptable, supporting various selection methods and configurations such as `weight`,
+`group`, `min`, `max`, and `time`. Ideal for applications needing nuanced and dynamic draws, it is more versatile than
+simpler draw mechanisms but optimized for manageable volumes.
 
 ## Support
 
