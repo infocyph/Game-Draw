@@ -3,3 +3,4 @@ vendor
 composer.lock
 git-story_media
 test.php
+*~
