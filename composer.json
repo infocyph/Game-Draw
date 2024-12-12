@@ -22,7 +22,7 @@
         "captainhook/captainhook": "^5.23",
         "laravel/pint": "^1.18",
         "pestphp/pest": "^3.5",
-        "rector/rector": "^1.2",
+        "rector/rector": "^1.2 || ^2.0",
         "symfony/var-dumper": "^7.1"
     },
     "minimum-stability": "stable",
