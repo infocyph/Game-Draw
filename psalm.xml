@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<psalm
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+    errorLevel="3"
+>
+    <projectFiles>
+        <directory name="src" />
+        <ignoreFiles>
+            <directory name="vendor" />
+            <directory name="tests" />
+        </ignoreFiles>
+    </projectFiles>
+
+    <!-- Security-focused issue handlers -->
+    <issueHandlers>
+        <!-- CRITICAL SECURITY ISSUES - Report as errors -->
+        <TaintedInput errorLevel="error" />
+        <TaintedSql errorLevel="error" />
+        <TaintedShell errorLevel="error" />
+        <TaintedHtml errorLevel="error" />
+        <TaintedXpath errorLevel="error" />
+        <TaintedInclude errorLevel="error" />
+        <TaintedUnserialize errorLevel="error" />
+        <TaintedEval errorLevel="error" />
+        <TaintedFile errorLevel="error" />
+
+        <!-- HIGH SECURITY ISSUES -->
+        <TaintedSSRF errorLevel="info" />
+    </issueHandlers>
+
+</psalm>

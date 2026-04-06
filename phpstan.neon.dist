@@ -1,0 +1,14 @@
+includes:
+    - vendor/tomasvotruba/cognitive-complexity/config/extension.neon
+
+parameters:
+    customRulesetUsed: true
+    paths:
+        - src
+    parallel:
+        maximumNumberOfProcesses: 1
+    cognitive_complexity:
+        class: 150
+        function: 14
+        dependency_tree: 150
+        dependency_tree_types: []

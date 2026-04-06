@@ -6,7 +6,7 @@
     "authors": [
         {
             "name": "abmmhasan",
-            "email": "abmmhasan346@gmail.com"
+            "email": "abmmhasan@gmail.com"
         }
     ],
     "autoload": {
@@ -15,15 +15,18 @@
         }
     },
     "require": {
-        "php": ">=8.0",
+        "php": ">=8.4",
         "ext-bcmath": "*"
     },
     "require-dev": {
-        "captainhook/captainhook": "^5.23",
-        "laravel/pint": "^1.18",
-        "pestphp/pest": "^3.5",
-        "rector/rector": "^1.2",
-        "symfony/var-dumper": "^7.1"
+        "captainhook/captainhook": "^5.29.2",
+        "laravel/pint": "^1.29",
+        "pestphp/pest": "^4.4.3",
+        "pestphp/pest-plugin-drift": "^4.1",
+        "rector/rector": "^2.3.9",
+        "symfony/var-dumper": "^7.3 || ^8.0.8",
+        "vimeo/psalm": "^6.16.1",
+        "tomasvotruba/cognitive-complexity": "^1.1"
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
@@ -35,26 +38,25 @@
         }
     },
     "scripts": {
-        "test:code": "pest --parallel --processes=10",
-        "test:refactor": "rector process --dry-run",
-        "test:lint": "pint --test",
-        "test:hook": [
-            "captainhook hook:post-checkout",
-            "captainhook hook:pre-commit",
-            "captainhook hook:post-commit",
-            "captainhook hook:post-merge",
-            "captainhook hook:post-rewrite",
-            "captainhook hook:pre-push"
-        ],
+        "test:code": "@php vendor/bin/pest --parallel --processes=10",
+        "test:security": "@php vendor/bin/psalm --config=psalm.xml --security-analysis --show-info=false --no-progress --threads=1",
+        "test:static": "@php vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --memory-limit=1G --no-progress",
+        "test:refactor": "@php vendor/bin/rector process --dry-run",
+        "test:lint": "@php vendor/bin/pint --test",
         "tests": [
             "@test:code",
             "@test:lint",
-            "@test:refactor"
+            "@test:static",
+            "@test:refactor",
+            "@test:security"
         ],
         "git:hook": "captainhook install --only-enabled -nf",
-        "test": "pest",
-        "refactor": "rector process",
-        "lint": "pint",
-        "post-autoload-dump": "@git:hook"
+        "test": "@php vendor/bin/pest",
+        "refactor": "@php vendor/bin/rector process",
+        "lint": "@php vendor/bin/pint",
+        "security:scan": "@test:security",
+        "post-autoload-dump": "captainhook install --only-enabled -nf",
+        "bench:performance": "@php benchmarks/DrawBench.php --fail-on-regression",
+        "bench:report": "@php benchmarks/DrawBench.php --json"
     }
 }

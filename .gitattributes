@@ -1,4 +1,5 @@
-# Exclude unnecessary files from exports
+.editorconfig export-ignore
+.gitignore export-ignore
 tests export-ignore
 docs export-ignore
 .github export-ignore
@@ -8,6 +9,7 @@ phpunit.xml export-ignore
 pint.json export-ignore
 rector.php export-ignore
 .gitattributes export-ignore
+psalm.xml export-ignore
+pest.xml export-ignore
 
-# Enforce LF
 *  text eol=lf
