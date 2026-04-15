@@ -2,6 +2,4 @@
 
 namespace Infocyph\Draw\Exceptions;
 
-class DrawExhaustedException extends DrawException
-{
-}
+class DrawExhaustedException extends DrawException {}

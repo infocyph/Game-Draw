@@ -9,9 +9,7 @@ use Infocyph\Draw\Flexible\Support\WeightTools;
 
 class WeightedEliminationDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function draw(FlexibleState $state): string
     {

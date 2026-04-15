@@ -6,9 +6,7 @@ use Infocyph\Draw\Exceptions\ValidationException;
 
 class WeightedBatchDraw
 {
-    public function __construct(private readonly ProbabilityDraw $probabilityDraw)
-    {
-    }
+    public function __construct(private readonly ProbabilityDraw $probabilityDraw) {}
 
     public function draw(FlexibleState $state, int $count): array
     {

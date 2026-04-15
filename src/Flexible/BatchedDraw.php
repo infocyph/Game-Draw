@@ -8,9 +8,7 @@ use Infocyph\Draw\Exceptions\ValidationException;
 
 class BatchedDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function draw(FlexibleState $state, int $count, bool $withReplacement): array
     {

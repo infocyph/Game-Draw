@@ -9,9 +9,7 @@ use Infocyph\Draw\Flexible\Support\WeightTools;
 
 class RangeWeightedDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function draw(FlexibleState $state): float|int
     {
@@ -36,7 +34,7 @@ class RangeWeightedDraw
         throw new DrawExhaustedException("Draw failed.");
     }
 
-    private function randomInRange(float|int $min, float|int $max): float|int
+    private function randomInRange(float|int $min, float|int $max): float
     {
         return $min + $this->random->float() * ($max - $min);
     }

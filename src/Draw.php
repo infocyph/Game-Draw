@@ -35,7 +35,7 @@ class Draw
 
     public function execute(array $request): array
     {
-        $method = trim((string)($request['method'] ?? ''));
+        $method = trim((string) ($request['method'] ?? ''));
         if ($method === '') {
             throw new ValidationException('method is required.');
         }

@@ -8,7 +8,7 @@ use Random\Randomizer;
 
 class SeededRandomGenerator implements RandomGeneratorInterface
 {
-    private Randomizer $randomizer;
+    private readonly Randomizer $randomizer;
 
     public function __construct(private readonly int $seed)
     {
@@ -33,6 +33,6 @@ class SeededRandomGenerator implements RandomGeneratorInterface
 
     public function seedFingerprint(): ?string
     {
-        return hash('xxh3', 'seed:'.$this->seed);
+        return hash('xxh3', 'seed:' . $this->seed);
     }
 }

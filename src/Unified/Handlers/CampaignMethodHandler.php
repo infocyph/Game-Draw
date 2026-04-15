@@ -17,13 +17,11 @@ use Infocyph\Draw\Unified\Support\ResultBuilder;
 
 class CampaignMethodHandler implements MethodHandlerInterface
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function execute(array $request): array
     {
-        $method = (string)($request['method'] ?? '');
+        $method = (string) ($request['method'] ?? '');
         $items = $request['items'] ?? null;
         $candidates = $request['candidates'] ?? null;
         $options = $request['options'] ?? [];
@@ -40,14 +38,14 @@ class CampaignMethodHandler implements MethodHandlerInterface
 
         $users = $this->normalizeUsers($candidates);
         $normalizedItems = $this->normalizeItems($items);
-        $rules = RuleSet::fromArray((array)($options['rules'] ?? []));
-        $auditSecret = isset($options['auditSecret']) ? (string)$options['auditSecret'] : '';
+        $rules = RuleSet::fromArray((array) ($options['rules'] ?? []));
+        $auditSecret = isset($options['auditSecret']) ? (string) $options['auditSecret'] : '';
 
         return match ($method) {
             'campaign.run' => $this->runCampaign($users, $normalizedItems, $rules, $auditSecret, $options),
             'campaign.batch' => $this->runBatch($users, $rules, $auditSecret, $options),
             'campaign.simulate' => $this->simulate($users, $normalizedItems, $rules, $options),
-            default => throw new ValidationException("Unsupported campaign method: {$method}")
+            default => throw new ValidationException("Unsupported campaign method: {$method}"),
         };
     }
 
@@ -138,10 +136,10 @@ class CampaignMethodHandler implements MethodHandlerInterface
             if (is_array($itemDefinition)) {
                 $itemId = is_string($itemKey)
                     ? $itemKey
-                    : trim((string)($itemDefinition['item'] ?? $itemDefinition['name'] ?? ''));
-                $count = (int)($itemDefinition['count'] ?? 1);
-                $weight = (float)($itemDefinition['weight'] ?? 1);
-                $group = isset($itemDefinition['group']) ? (string)$itemDefinition['group'] : null;
+                    : trim((string) ($itemDefinition['item'] ?? $itemDefinition['name'] ?? ''));
+                $count = (int) ($itemDefinition['count'] ?? 1);
+                $weight = (float) ($itemDefinition['weight'] ?? 1);
+                $group = isset($itemDefinition['group']) ? (string) $itemDefinition['group'] : null;
             } elseif (is_int($itemDefinition)) {
                 $itemId = is_string($itemKey) ? $itemKey : '';
                 $count = $itemDefinition;
@@ -169,8 +167,8 @@ class CampaignMethodHandler implements MethodHandlerInterface
     private function normalizeUsers(array $users): array
     {
         $normalized = array_values(array_unique(array_filter(
-            array_map(fn ($user) => trim((string)$user), $users),
-            fn ($user) => $user !== '',
+            array_map(fn($user) => trim((string) $user), $users),
+            fn($user) => $user !== '',
         )));
 
         DrawValidator::assertNotEmpty($normalized, 'candidates must contain at least one user id.');
@@ -229,17 +227,17 @@ class CampaignMethodHandler implements MethodHandlerInterface
             throw new ValidationException('options.phases is required and must be a non-empty array for campaign.batch.');
         }
 
-        $withExplain = (bool)($options['withExplain'] ?? false);
-        $retryLimit = max(1, (int)($options['retryLimit'] ?? 100));
+        $withExplain = (bool) ($options['withExplain'] ?? false);
+        $retryLimit = max(1, (int) ($options['retryLimit'] ?? 100));
         $stateAdapter = new MemoryStateAdapter();
         $phaseResults = [];
 
         foreach ($phases as $index => $phase) {
             is_array($phase) || throw new ValidationException("Phase at index {$index} must be an array.");
-            $phaseName = (string)($phase['name'] ?? 'phase_'.($index + 1));
+            $phaseName = (string) ($phase['name'] ?? 'phase_' . ($index + 1));
             isset($phase['items']) || throw new ValidationException("Phase '{$phaseName}' must define items.");
 
-            $phaseItems = $this->normalizeItems((array)$phase['items']);
+            $phaseItems = $this->normalizeItems((array) $phase['items']);
             $phaseRules = $phase['rules'] ?? $defaultRules;
             $phaseRules = is_array($phaseRules) ? RuleSet::fromArray($phaseRules) : $phaseRules;
             $phaseRules instanceof RuleSet || throw new ValidationException("Phase '{$phaseName}' has invalid rules.");
@@ -274,10 +272,10 @@ class CampaignMethodHandler implements MethodHandlerInterface
             foreach ($phaseResult['winners'] as $item => $users) {
                 foreach ($users as $user) {
                     $entries[] = ResultBuilder::entry(
-                        (string)$item,
-                        (string)$user,
+                        (string) $item,
+                        (string) $user,
                         $user,
-                        ['phase' => (string)$phaseName],
+                        ['phase' => $phaseName],
                     );
                 }
             }
@@ -294,8 +292,8 @@ class CampaignMethodHandler implements MethodHandlerInterface
 
     private function runCampaign(array $users, array $items, RuleSet $rules, string $auditSecret, array $options): array
     {
-        $withExplain = (bool)($options['withExplain'] ?? false);
-        $retryLimit = max(1, (int)($options['retryLimit'] ?? 100));
+        $withExplain = (bool) ($options['withExplain'] ?? false);
+        $retryLimit = max(1, (int) ($options['retryLimit'] ?? 100));
         $raw = $this->executeCampaign(
             users: $users,
             items: $items,
@@ -310,7 +308,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
         $entries = [];
         foreach ($raw['winners'] as $item => $users) {
             foreach ($users as $user) {
-                $entries[] = ResultBuilder::entry((string)$item, (string)$user, $user);
+                $entries[] = ResultBuilder::entry((string) $item, (string) $user, $user);
             }
         }
 
@@ -325,8 +323,8 @@ class CampaignMethodHandler implements MethodHandlerInterface
 
     private function simulate(array $users, array $items, RuleSet $rules, array $options): array
     {
-        $iterations = max(1, (int)($options['iterations'] ?? 1000));
-        $retryLimit = max(1, (int)($options['retryLimit'] ?? 100));
+        $iterations = max(1, (int) ($options['iterations'] ?? 1000));
+        $retryLimit = max(1, (int) ($options['retryLimit'] ?? 100));
 
         $userWins = array_fill_keys($users, 0);
         $itemWins = array_fill_keys(array_keys($items), 0);
@@ -386,9 +384,9 @@ class CampaignMethodHandler implements MethodHandlerInterface
         foreach ($raw['userDistribution'] as $user => $distribution) {
             $entries[] = ResultBuilder::entry(
                 itemId: null,
-                candidateId: (string)$user,
-                value: (float)$distribution['rate'],
-                meta: ['kind' => 'userDistribution', 'wins' => (int)$distribution['wins']],
+                candidateId: (string) $user,
+                value: (float) $distribution['rate'],
+                meta: ['kind' => 'userDistribution', 'wins' => $distribution['wins']],
             );
         }
 
@@ -410,7 +408,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
                 continue;
             }
             if (is_array($item)) {
-                $sum += (int)($item['count'] ?? 1);
+                $sum += (int) ($item['count'] ?? 1);
             }
         }
         return max(1, $sum);

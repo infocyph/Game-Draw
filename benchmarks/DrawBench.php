@@ -2,139 +2,235 @@
 
 declare(strict_types=1);
 
+namespace Infocyph\Draw\Benchmarks;
+
 use Infocyph\Draw\Draw;
 use Infocyph\Draw\Random\SeededRandomGenerator;
+use PhpBench\Attributes as Bench;
 
-$autoload = __DIR__.'/../vendor/autoload.php';
-if (is_file($autoload)) {
-    require_once $autoload;
-} else {
-    spl_autoload_register(static function (string $class): void {
-        $prefix = 'Infocyph\\Draw\\';
-        if (!str_starts_with($class, $prefix)) {
-            return;
-        }
-
-        $relative = substr($class, strlen($prefix));
-        $path = __DIR__.'/../src/'.str_replace('\\', DIRECTORY_SEPARATOR, $relative).'.php';
-        is_file($path) && require_once $path;
-    });
-}
-
-$options = getopt('', ['json', 'iterations::', 'fail-on-regression']);
-$iterations = max(100, (int)($options['iterations'] ?? 2500));
-
-$metrics = [];
-$metrics['lucky_ms'] = bench(function () use ($iterations): void {
-    $draw = new Draw(new SeededRandomGenerator(101));
-
-    for ($i = 0; $i < $iterations; $i++) {
-        $draw->execute([
-            'method' => 'lucky',
-            'items' => [
-                ['item' => 'a', 'chances' => 50, 'amounts' => [1, 2, 3]],
-                ['item' => 'b', 'chances' => 25, 'amounts' => [1, 2, 3]],
-                ['item' => 'c', 'chances' => 25, 'amounts' => [1, 2, 3]],
-            ],
-        ]);
+#[Bench\Iterations(5)]
+#[Bench\Warmup(1)]
+final class DrawBench
+{
+    #[Bench\Revs(12)]
+    #[Bench\ParamProviders('provideCampaignRequests')]
+    public function benchCampaignMethods(array $params): void
+    {
+        $draw = new Draw(new SeededRandomGenerator(103));
+        $draw->execute($params['request']);
     }
-});
 
-$metrics['flexible_ms'] = bench(function () use ($iterations): void {
-    $draw = new Draw(new SeededRandomGenerator(102));
-
-    for ($i = 0; $i < $iterations; $i++) {
-        $draw->execute([
-            'method' => 'probability',
-            'items' => [
-                ['name' => 'a', 'weight' => 0.6],
-                ['name' => 'b', 'weight' => 0.3],
-                ['name' => 'c', 'weight' => 0.1],
-            ],
-        ]);
+    #[Bench\Revs(30)]
+    #[Bench\ParamProviders('provideGrandRequests')]
+    public function benchGrandMethod(array $params): void
+    {
+        $draw = new Draw(new SeededRandomGenerator(102));
+        $draw->execute($params['request']);
     }
-});
-
-$metrics['grand_ms'] = bench(function () use ($iterations): void {
-    $draw = new Draw(new SeededRandomGenerator(103));
-    $users = array_map(static fn (int $i): string => 'u'.$i, range(1, 2000));
-
-    for ($i = 0; $i < (int)($iterations / 25); $i++) {
-        $draw->execute([
-            'method' => 'grand',
-            'items' => ['a' => 50, 'b' => 50, 'c' => 50],
-            'candidates' => $users,
-            'options' => ['retryCount' => 300],
-        ]);
+    #[Bench\Revs(100)]
+    #[Bench\ParamProviders('provideItemRequests')]
+    public function benchItemMethods(array $params): void
+    {
+        $draw = new Draw(new SeededRandomGenerator(101));
+        $draw->execute($params['request']);
     }
-});
 
-$metrics['campaign_ms'] = bench(function () use ($iterations): void {
-    $draw = new Draw(new SeededRandomGenerator(104));
-    $users = array_map(static fn (int $i): string => 'u'.$i, range(1, 500));
+    public function provideCampaignRequests(): iterable
+    {
+        $candidates = $this->buildCandidates(500);
 
-    for ($i = 0; $i < (int)($iterations / 50); $i++) {
-        $draw->execute([
-            'method' => 'campaign.run',
-            'items' => [
-                'gold' => ['count' => 20, 'group' => 'g1'],
-                'silver' => ['count' => 20, 'group' => 'g2'],
+        yield 'campaign.run' => [
+            'request' => [
+                'method' => 'campaign.run',
+                'items' => [
+                    'gold' => ['count' => 20, 'group' => 'g1'],
+                    'silver' => ['count' => 20, 'group' => 'g2'],
+                ],
+                'candidates' => $candidates,
+                'options' => [
+                    'rules' => ['perUserCap' => 1],
+                    'retryLimit' => 200,
+                ],
             ],
-            'candidates' => $users,
-            'options' => [
-                'rules' => ['perUserCap' => 1],
-                'retryLimit' => 200,
+        ];
+
+        yield 'campaign.batch' => [
+            'request' => [
+                'method' => 'campaign.batch',
+                'items' => ['bootstrap' => ['count' => 1]],
+                'candidates' => $candidates,
+                'options' => [
+                    'rules' => ['perUserCap' => 1],
+                    'phases' => [
+                        ['name' => 'phase_1', 'items' => ['item_a' => ['count' => 8, 'group' => 'g1']]],
+                        ['name' => 'phase_2', 'items' => ['item_b' => ['count' => 8, 'group' => 'g2']]],
+                    ],
+                    'retryLimit' => 200,
+                ],
             ],
-        ]);
-    }
-});
+        ];
 
-$baselinePath = __DIR__.'/baseline.json';
-$baseline = is_file($baselinePath)
-    ? json_decode((string)file_get_contents($baselinePath), true)
-    : [];
-$regressions = [];
-
-foreach ($baseline as $metric => $maxMs) {
-    if (isset($metrics[$metric]) && $metrics[$metric] > (float)$maxMs) {
-        $regressions[$metric] = [
-            'actual' => $metrics[$metric],
-            'threshold' => (float)$maxMs,
+        yield 'campaign.simulate' => [
+            'request' => [
+                'method' => 'campaign.simulate',
+                'items' => [
+                    'gold' => ['count' => 2, 'group' => 'g1'],
+                    'silver' => ['count' => 4, 'group' => 'g2'],
+                ],
+                'candidates' => $candidates,
+                'options' => [
+                    'iterations' => 25,
+                    'retryLimit' => 100,
+                    'rules' => ['perUserCap' => 1],
+                ],
+            ],
         ];
     }
-}
 
-$payload = [
-    'iterations' => $iterations,
-    'metrics_ms' => $metrics,
-    'regressions' => $regressions,
-];
+    public function provideGrandRequests(): iterable
+    {
+        $candidates = $this->buildCandidates(2_000);
 
-if (array_key_exists('json', $options)) {
-    fwrite(STDOUT, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
-} else {
-    fwrite(STDOUT, "Performance benchmark (ms)\n");
-    foreach ($metrics as $name => $value) {
-        fwrite(STDOUT, str_pad($name, 16, ' ', STR_PAD_RIGHT).': '.number_format($value, 2).PHP_EOL);
+        yield 'grand' => [
+            'request' => [
+                'method' => 'grand',
+                'items' => ['gift_1' => 50, 'gift_2' => 50, 'gift_3' => 50],
+                'candidates' => $candidates,
+                'options' => ['retryCount' => 300],
+            ],
+        ];
     }
-    if (!empty($regressions)) {
-        fwrite(STDOUT, "Regressions detected:\n");
-        foreach ($regressions as $name => $data) {
-            fwrite(STDOUT, "{$name}: {$data['actual']} > {$data['threshold']}".PHP_EOL);
-        }
+
+    public function provideItemRequests(): iterable
+    {
+        yield 'lucky' => [
+            'request' => [
+                'method' => 'lucky',
+                'items' => [
+                    ['item' => 'gift_a', 'chances' => 10, 'amounts' => [1, 2]],
+                    ['item' => 'gift_b', 'chances' => 20, 'amounts' => [3, 4]],
+                ],
+                'options' => ['count' => 3],
+            ],
+        ];
+
+        yield 'probability' => [
+            'request' => [
+                'method' => 'probability',
+                'items' => [
+                    ['name' => 'item1', 'weight' => 10],
+                    ['name' => 'item2', 'weight' => 20],
+                ],
+                'options' => ['count' => 2],
+            ],
+        ];
+
+        yield 'elimination' => [
+            'request' => [
+                'method' => 'elimination',
+                'items' => [
+                    ['name' => 'item1'],
+                    ['name' => 'item2'],
+                ],
+                'options' => ['count' => 2],
+            ],
+        ];
+
+        yield 'weightedElimination' => [
+            'request' => [
+                'method' => 'weightedElimination',
+                'items' => [
+                    ['name' => 'item1', 'weight' => 5],
+                    ['name' => 'item2', 'weight' => 10],
+                ],
+                'options' => ['count' => 2],
+            ],
+        ];
+
+        yield 'roundRobin' => [
+            'request' => [
+                'method' => 'roundRobin',
+                'items' => [
+                    ['name' => 'item1'],
+                    ['name' => 'item2'],
+                ],
+                'options' => ['count' => 3],
+            ],
+        ];
+
+        yield 'cumulative' => [
+            'request' => [
+                'method' => 'cumulative',
+                'items' => [
+                    ['name' => 'item1'],
+                    ['name' => 'item2'],
+                ],
+                'options' => ['count' => 3],
+            ],
+        ];
+
+        yield 'batched' => [
+            'request' => [
+                'method' => 'batched',
+                'items' => [
+                    ['name' => 'item1'],
+                    ['name' => 'item2'],
+                    ['name' => 'item3'],
+                ],
+                'options' => ['count' => 2, 'withReplacement' => false],
+            ],
+        ];
+
+        yield 'timeBased' => [
+            'request' => [
+                'method' => 'timeBased',
+                'items' => [
+                    ['name' => 'item1', 'weight' => 10, 'time' => 'daily'],
+                    ['name' => 'item2', 'weight' => 20, 'time' => 'weekly'],
+                ],
+                'options' => ['count' => 2],
+            ],
+        ];
+
+        yield 'weightedBatch' => [
+            'request' => [
+                'method' => 'weightedBatch',
+                'items' => [
+                    ['name' => 'item1', 'weight' => 10],
+                    ['name' => 'item2', 'weight' => 20],
+                ],
+                'options' => ['count' => 3],
+            ],
+        ];
+
+        yield 'sequential' => [
+            'request' => [
+                'method' => 'sequential',
+                'items' => [
+                    ['name' => 'item1'],
+                    ['name' => 'item2'],
+                ],
+                'options' => ['count' => 3],
+            ],
+        ];
+
+        yield 'rangeWeighted' => [
+            'request' => [
+                'method' => 'rangeWeighted',
+                'items' => [
+                    ['name' => 'item1', 'min' => 1, 'max' => 50, 'weight' => 10],
+                    ['name' => 'item2', 'min' => 5, 'max' => 25, 'weight' => 15],
+                ],
+                'options' => ['count' => 2],
+            ],
+        ];
     }
-}
 
-if (array_key_exists('fail-on-regression', $options) && !empty($regressions)) {
-    exit(1);
-}
-
-exit(0);
-
-function bench(callable $task): float
-{
-    $start = hrtime(true);
-    $task();
-    $end = hrtime(true);
-    return round(($end - $start) / 1_000_000, 3);
+    private function buildCandidates(int $count): array
+    {
+        return array_map(
+            static fn(int $index): string => 'user_' . $index,
+            range(1, $count),
+        );
+    }
 }

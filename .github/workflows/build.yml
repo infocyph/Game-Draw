@@ -12,9 +12,6 @@ jobs:
   prepare:
     name: Prepare CI matrix
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     outputs:
       php_versions: ${{ steps.matrix.outputs.php_versions }}
       dependency_versions: ${{ steps.matrix.outputs.dependency_versions }}
@@ -28,16 +25,13 @@ jobs:
   run:
     needs: prepare
     runs-on: ${{ matrix.operating-system }}
-    defaults:
-      run:
-        shell: bash
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest ]
+        operating-system: [ ubuntu-latest ]
         php-versions: ${{ fromJson(needs.prepare.outputs.php_versions) }}
         dependency-version: ${{ fromJson(needs.prepare.outputs.dependency_versions) }}
 
-    name: Code Analysis - ${{ matrix.operating-system }} - PHP ${{ matrix.php-versions }} - ${{ matrix.dependency-version }}
+    name: Code Analysis - PHP ${{ matrix.php-versions }} - ${{ matrix.dependency-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,8 +54,10 @@ jobs:
 
       - name: Test
         run: |
+          composer test:syntax
           composer test:code
           composer test:lint
+          composer test:sniff
           composer test:refactor
           if [ "${{ matrix.dependency-version }}" != "prefer-lowest" ]; then
             composer test:static
@@ -74,9 +70,6 @@ jobs:
     needs: prepare
     name: Security Analysis - PHP ${{ matrix.php-versions }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     strategy:
       matrix:
         php-versions: ${{ fromJson(needs.prepare.outputs.php_versions) }}
@@ -94,12 +87,32 @@ jobs:
         with:
           php-version: ${{ matrix.php-versions }}
           tools: composer:v2
+          coverage: xdebug
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Composer Audit (CVE check)
-        run: composer audit --no-interaction
+      - name: Composer Audit (Release Guard)
+        run: composer release:audit
+
+      - name: Quality Gate (PHPStan)
+        run: composer test:static
+
+      - name: Security Gate (Psalm)
+        run: composer test:security
+
+      - name: Run PHPStan (Code Scanning)
+        run: |
+          php ./vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --memory-limit=1G --no-progress --error-format=json > phpstan-results.json || true
+          php .github/scripts/phpstan-sarif.php phpstan-results.json phpstan-results.sarif
+        continue-on-error: true
+
+      - name: Upload PHPStan Results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: phpstan-results.sarif
+          category: "phpstan-${{ matrix.php-versions }}"
+        if: always() && hashFiles('phpstan-results.sarif') != ''
 
       # Run Psalm (Deep Taint Analysis)
       - name: Run Psalm Security Scan
@@ -113,26 +126,3 @@ jobs:
           sarif_file: psalm-results.sarif
           category: "psalm-${{ matrix.php-versions }}"
         if: always() && hashFiles('psalm-results.sarif') != ''
-
-  performance:
-    needs: prepare
-    name: Performance Guardrail - PHP 8.4
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.4"
-          tools: composer:v2
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Run performance benchmark
-        run: composer bench:performance

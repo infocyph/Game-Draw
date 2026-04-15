@@ -10,9 +10,7 @@ use Infocyph\Draw\Flexible\Support\WeightTools;
 
 class TimeBasedWeightedDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function draw(FlexibleState $state): string
     {
@@ -44,7 +42,7 @@ class TimeBasedWeightedDraw
             return match (true) {
                 $aIsOld && !$bIsOld => -1,
                 !$aIsOld && $bIsOld => 1,
-                default => $b['weight'] <=> $a['weight']
+                default => $b['weight'] <=> $a['weight'],
             };
         });
 

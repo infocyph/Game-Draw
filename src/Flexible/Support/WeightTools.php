@@ -6,19 +6,15 @@ use Infocyph\Draw\Exceptions\ValidationException;
 
 final class WeightTools
 {
-    /**
-     * @param array $items
-     * @return int
-     */
     public static function maxFractionLength(array $items): int
     {
         $maxFractionLength = 0;
         foreach ($items as $item) {
-            $rawWeight = (string)($item['weight'] ?? '');
+            $rawWeight = (string) ($item['weight'] ?? '');
             is_numeric($rawWeight) || throw new ValidationException("Weight must be numeric.");
 
             if (stripos($rawWeight, 'e') !== false) {
-                $rawWeight = rtrim(rtrim(sprintf('%.14F', (float)$rawWeight), '0'), '.');
+                $rawWeight = rtrim(rtrim(sprintf('%.14F', (float) $rawWeight), '0'), '.');
             }
 
             $dotPosition = strpos($rawWeight, '.');
@@ -29,7 +25,6 @@ final class WeightTools
         return $maxFractionLength;
     }
     /**
-     * @param array $items
      * @return array{0: array<int, array{index: int, weight: int}>, 1: int}
      */
     public static function prepare(array $items): array
@@ -40,9 +35,9 @@ final class WeightTools
         $totalWeight = 0;
 
         foreach ($items as $index => $item) {
-            $weight = (float)$item['weight'];
+            $weight = (float) $item['weight'];
             $weight < 0 && throw new ValidationException("Weight must be greater than or equal to zero.");
-            $scaledWeight = (int)round($weight * $multiplier);
+            $scaledWeight = (int) round($weight * $multiplier);
             $weights[] = ['index' => $index, 'weight' => $scaledWeight];
             $totalWeight += $scaledWeight;
         }

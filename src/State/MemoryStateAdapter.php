@@ -20,7 +20,7 @@ class MemoryStateAdapter implements StateAdapterInterface
 
     public function increment(string $key, int $by = 1): int
     {
-        $current = (int)($this->state[$key] ?? 0);
+        $current = (int) ($this->state[$key] ?? 0);
         $current += $by;
         $this->state[$key] = $current;
         return $current;

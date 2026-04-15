@@ -4,6 +4,4 @@ namespace Infocyph\Draw\Exceptions;
 
 use Exception;
 
-class DrawException extends Exception
-{
-}
+class DrawException extends Exception {}

@@ -12,6 +12,6 @@ class FlexibleState
 
     public function __construct(public array $items)
     {
-        $this->ranges = array_filter($items, fn ($item) => isset($item['min'], $item['max'], $item['weight']));
+        $this->ranges = array_filter($items, fn($item) => isset($item['min'], $item['max'], $item['weight']));
     }
 }

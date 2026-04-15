@@ -3,7 +3,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns="https://getpsalm.org/schema/config"
     xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
-    errorLevel="3"
+    errorLevel="2"
 >
     <projectFiles>
         <directory name="src" />
@@ -28,6 +28,13 @@
 
         <!-- HIGH SECURITY ISSUES -->
         <TaintedSSRF errorLevel="info" />
+
+        <!-- Dead-code reporting for library APIs (informational by default) -->
+        <UnusedClass errorLevel="error" />
+        <UnusedConstructor errorLevel="info" />
+        <PossiblyUnusedMethod errorLevel="info" />
+        <PossiblyUnusedProperty errorLevel="info" />
+        <PossiblyUnusedReturnValue errorLevel="info" />
     </issueHandlers>
 
 </psalm>

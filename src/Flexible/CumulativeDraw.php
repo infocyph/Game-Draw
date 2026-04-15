@@ -7,9 +7,7 @@ use Infocyph\Draw\Exceptions\EmptyPoolException;
 
 class CumulativeDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function draw(FlexibleState $state): string
     {

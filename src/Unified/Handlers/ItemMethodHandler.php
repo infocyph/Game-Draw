@@ -21,13 +21,11 @@ use Infocyph\Draw\Unified\Support\ResultBuilder;
 
 class ItemMethodHandler implements MethodHandlerInterface
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function execute(array $request): array
     {
-        $method = (string)($request['method'] ?? '');
+        $method = (string) ($request['method'] ?? '');
         $items = $request['items'] ?? null;
         $options = $request['options'] ?? [];
 
@@ -68,7 +66,7 @@ class ItemMethodHandler implements MethodHandlerInterface
             'weightedElimination', 'probability', 'weightedBatch' => ['name' => true, 'weight' => true],
             'timeBased' => ['name' => true, 'weight' => true, 'time' => true],
             'rangeWeighted' => ['name' => true, 'min' => true, 'max' => true, 'weight' => true],
-            default => ['name' => true]
+            default => ['name' => true],
         };
 
         DrawValidator::assertRequiredKeys($items, $requiredKeys, "Item");
@@ -92,25 +90,25 @@ class ItemMethodHandler implements MethodHandlerInterface
     private function drawWeighted(array $items): string
     {
         if (count($items) === 1) {
-            return (string)key($items);
+            return (string) key($items);
         }
 
         $random = $this->random->int(1, array_sum($items));
         foreach ($items as $key => $value) {
-            $random -= (int)$value;
+            $random -= (int) $value;
             if ($random <= 0) {
-                return (string)$key;
+                return (string) $key;
             }
         }
 
-        return (string)array_search(max($items), $items, true);
+        return (string) array_search(max($items), $items, true);
     }
 
     private function executeFlexible(string $method, array $items, array $options): array
     {
-        $count = max(1, (int)($options['count'] ?? 1));
-        $withReplacement = (bool)($options['withReplacement'] ?? false);
-        $check = (bool)($options['check'] ?? true);
+        $count = max(1, (int) ($options['count'] ?? 1));
+        $withReplacement = (bool) ($options['withReplacement'] ?? false);
+        $check = (bool) ($options['check'] ?? true);
 
         $state = new FlexibleState($items);
         $strategy = $this->strategy($method);
@@ -129,7 +127,7 @@ class ItemMethodHandler implements MethodHandlerInterface
                 default => throw new ValidationException("Unsupported batch-capable method: {$method}"),
             };
             $raw = $result;
-            foreach ((array)$result as $value) {
+            foreach ((array) $result as $value) {
                 $entries[] = ResultBuilder::entry(
                     itemId: is_string($value) ? $value : null,
                     candidateId: null,
@@ -155,8 +153,8 @@ class ItemMethodHandler implements MethodHandlerInterface
 
     private function executeLucky(array $items, array $options): array
     {
-        $count = max(1, (int)($options['count'] ?? 1));
-        $check = (bool)($options['check'] ?? true);
+        $count = max(1, (int) ($options['count'] ?? 1));
+        $check = (bool) ($options['check'] ?? true);
         $entries = [];
         $raw = [];
 
@@ -168,7 +166,7 @@ class ItemMethodHandler implements MethodHandlerInterface
             $pick = $this->pickLucky($items);
             $raw[] = $pick;
             $entries[] = ResultBuilder::entry(
-                itemId: (string)$pick['item'],
+                itemId: (string) $pick['item'],
                 candidateId: null,
                 value: $pick['amount'],
                 meta: ['amount' => $pick['amount']],
@@ -183,7 +181,7 @@ class ItemMethodHandler implements MethodHandlerInterface
         $length = 0;
         foreach ($items as $item) {
             DrawValidator::assertPositiveNumeric($item, 'Chances');
-            $value = (string)$item;
+            $value = (string) $item;
             $dot = strpos($value, '.');
             $dot !== false && $length = max($length, strlen($value) - $dot - 1);
         }
@@ -200,7 +198,7 @@ class ItemMethodHandler implements MethodHandlerInterface
         if (!is_numeric($value)) {
             throw new ValidationException('Weighted amount keys must be numeric.');
         }
-        return str_contains($value, '.') ? (float)$value : (int)$value;
+        return str_contains($value, '.') ? (float) $value : (int) $value;
     }
 
     private function pickLucky(array $items): array
@@ -221,7 +219,7 @@ class ItemMethodHandler implements MethodHandlerInterface
 
         return [
             'item' => $pickedItem,
-            'amount' => $this->selectLuckyAmount((array)$amounts),
+            'amount' => $this->selectLuckyAmount((array) $amounts),
         ];
     }
 
@@ -233,7 +231,7 @@ class ItemMethodHandler implements MethodHandlerInterface
         }
 
         $multiplier = 10 ** $length;
-        return array_map(fn ($value) => (int)bcmul((string)$value, (string)$multiplier), $items);
+        return array_map(fn($value) => (int) bcmul((string) $value, (string) $multiplier), $items);
     }
 
     private function selectLuckyAmount(array $amounts): float|int
@@ -262,11 +260,11 @@ class ItemMethodHandler implements MethodHandlerInterface
         };
     }
 
-    private function weightedAmountRange(string $amounts): float|int
+    private function weightedAmountRange(string $amounts): float
     {
         $parts = str_getcsv($amounts, ',', '"', '\\');
         count($parts) !== 3 && throw new ValidationException('Invalid amount range (expected: min,max,bias).');
-        [$min, $max, $bias] = array_map('floatval', $parts);
+        [$min, $max, $bias] = array_map(floatval(...), $parts);
         $max <= $min && throw new ValidationException('Maximum value should be greater than minimum.');
         $bias <= 0 && throw new ValidationException('Bias should be greater than 0.');
 

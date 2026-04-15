@@ -36,10 +36,10 @@ class RuleSet
     public static function fromArray(array $rules): self
     {
         return new self(
-            perUserCap: (int)($rules['perUserCap'] ?? 1),
-            perItemCap: (array)($rules['perItemCap'] ?? []),
-            groupQuota: (array)($rules['groupQuota'] ?? []),
-            cooldownSeconds: (int)($rules['cooldownSeconds'] ?? 0),
+            perUserCap: (int) ($rules['perUserCap'] ?? 1),
+            perItemCap: (array) ($rules['perItemCap'] ?? []),
+            groupQuota: (array) ($rules['groupQuota'] ?? []),
+            cooldownSeconds: (int) ($rules['cooldownSeconds'] ?? 0),
         );
     }
 

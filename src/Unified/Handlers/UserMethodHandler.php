@@ -10,13 +10,11 @@ use SplFileObject;
 
 class UserMethodHandler implements MethodHandlerInterface
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function execute(array $request): array
     {
-        $method = (string)($request['method'] ?? '');
+        $method = (string) ($request['method'] ?? '');
         if ($method !== 'grand') {
             throw new ValidationException("Unsupported user draw method: {$method}");
         }
@@ -31,16 +29,16 @@ class UserMethodHandler implements MethodHandlerInterface
         }
 
         $source = $this->resolveSource($request);
-        $retryCount = max(1, (int)($options['retryCount'] ?? 10));
-        $requestedCount = max(1, array_sum(array_map('intval', $items)));
+        $retryCount = max(1, (int) ($options['retryCount'] ?? 10));
+        $requestedCount = max(1, array_sum(array_map(intval(...), $items)));
         $users = $this->loadUsers($source['path']);
         $raw = $this->drawWinners($items, $users, $retryCount);
         $entries = [];
         foreach ($raw as $item => $users) {
             foreach ($users as $user) {
                 $entries[] = ResultBuilder::entry(
-                    itemId: (string)$item,
-                    candidateId: (string)$user,
+                    itemId: (string) $item,
+                    candidateId: (string) $user,
                     value: $user,
                 );
             }
@@ -120,7 +118,7 @@ class UserMethodHandler implements MethodHandlerInterface
         $users = [];
         while (!$file->eof()) {
             $row = $file->fgetcsv(',', '"', '\\');
-            $id = trim((string)($row[0] ?? ''));
+            $id = trim((string) ($row[0] ?? ''));
             $id !== '' && $users[] = $id;
         }
 
@@ -137,7 +135,7 @@ class UserMethodHandler implements MethodHandlerInterface
      */
     private function resolveSource(array $request): array
     {
-        $sourceFile = trim((string)($request['sourceFile'] ?? ''));
+        $sourceFile = trim((string) ($request['sourceFile'] ?? ''));
         if ($sourceFile !== '') {
             return ['path' => $sourceFile, 'temporary' => false];
         }
@@ -148,15 +146,15 @@ class UserMethodHandler implements MethodHandlerInterface
         }
 
         $users = array_values(array_filter(
-            array_map(fn ($value) => trim((string)$value), $candidates),
-            fn ($value) => $value !== '',
+            array_map(fn($value) => trim((string) $value), $candidates),
+            fn($value) => $value !== '',
         ));
         if (empty($users)) {
             throw new ValidationException('candidates must contain at least one non-empty user id.');
         }
 
-        $tmp = sys_get_temp_dir().DIRECTORY_SEPARATOR.'draw-candidates-'.uniqid('', true).'.csv';
-        file_put_contents($tmp, implode(PHP_EOL, $users).PHP_EOL, LOCK_EX);
+        $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'draw-candidates-' . uniqid('', true) . '.csv';
+        file_put_contents($tmp, implode(PHP_EOL, $users) . PHP_EOL, LOCK_EX);
         return ['path' => $tmp, 'temporary' => true];
     }
 }

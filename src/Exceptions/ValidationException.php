@@ -2,6 +2,4 @@
 
 namespace Infocyph\Draw\Exceptions;
 
-class ValidationException extends DrawException
-{
-}
+class ValidationException extends DrawException {}

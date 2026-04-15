@@ -8,9 +8,7 @@ use Infocyph\Draw\Flexible\Support\WeightTools;
 
 class ProbabilityDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random)
-    {
-    }
+    public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     public function draw(FlexibleState $state): string
     {

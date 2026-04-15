@@ -16,7 +16,7 @@ final class DrawValidator
     public static function assertNonNegativeNumeric(mixed $value, string $field): void
     {
         self::assertNumeric($value, $field);
-        if ((float)$value < 0) {
+        if ((float) $value < 0) {
             throw new ValidationException("{$field} must be greater than or equal to zero.");
         }
     }
@@ -37,7 +37,7 @@ final class DrawValidator
     public static function assertPositiveNumeric(mixed $value, string $field): void
     {
         self::assertNumeric($value, $field);
-        if ((float)$value <= 0) {
+        if ((float) $value <= 0) {
             throw new ValidationException("{$field} must be greater than zero.");
         }
     }
@@ -59,7 +59,7 @@ final class DrawValidator
             $missingKeys = array_diff_key($requiredKeys, $item);
             if (!empty($missingKeys)) {
                 throw new ValidationException(
-                    "{$context} at index {$index} is missing required keys: ".implode(', ', array_keys($missingKeys)),
+                    "{$context} at index {$index} is missing required keys: " . implode(', ', array_keys($missingKeys)),
                 );
             }
         }

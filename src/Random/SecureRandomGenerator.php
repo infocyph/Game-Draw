@@ -8,7 +8,7 @@ use Random\Randomizer;
 
 class SecureRandomGenerator implements RandomGeneratorInterface
 {
-    private Randomizer $randomizer;
+    private readonly Randomizer $randomizer;
 
     public function __construct()
     {
