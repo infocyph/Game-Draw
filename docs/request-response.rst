@@ -36,6 +36,45 @@ Method-to-Required-Field Map
 - `campaign.batch`: `candidates` + `options.phases`
 - `campaign.simulate`: `items` + `candidates`
 
+Method Option Matrix
+--------------------
+
+`lucky`
+   - `options.count` (default `1`)
+   - `options.check` (default `true`)
+
+Flexible item methods
+   - `options.count` (default `1`)
+   - `options.check` (default `true`)
+   - `options.withReplacement` (`batched` only, default `false`)
+
+`grand`
+   - `options.retryCount` (compatibility metadata; pool-based logic is used)
+
+`campaign.run`
+   - `options.rules`
+   - `options.seed`
+   - `options.cachePool`
+   - `options.eligibility`
+   - `options.auditSecret`
+   - `options.withExplain` (default `false`)
+   - `options.retryLimit` (compatibility metadata)
+
+`campaign.batch`
+   - `options.phases` (required)
+   - `options.rules`
+   - `options.seed`
+   - `options.cachePool`
+   - `options.eligibility`
+   - `options.auditSecret`
+   - `options.withExplain`
+   - `options.retryLimit` (compatibility metadata)
+
+`campaign.simulate`
+   - `options.iterations` (default `1000`)
+   - `options.seed` (default `0`)
+   - `options.retryLimit` (compatibility metadata)
+
 Unified Response Envelope
 -------------------------
 

@@ -28,6 +28,26 @@ Check fulfillment:
        // inspect partialReason + unfilledCount
    }
 
+Scenario 1b: Grand Draw from CSV Source
+---------------------------------------
+
+When candidates come from a file instead of an in-memory list:
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'grand',
+       'items' => ['gift_card' => 5],
+       'sourceFile' => '/path/to/users.csv',
+   ]);
+
+CSV notes:
+
+- first column is treated as user ID
+- duplicates are deduplicated
+- no header auto-skip
+
 Scenario 2: Weighted Reward Amounts
 -----------------------------------
 
@@ -94,6 +114,15 @@ Use `campaign.run` with `withExplain` for why/why-not traces.
        ],
    ]);
 
+Inspect explain payload:
+
+.. code-block:: php
+
+   <?php
+   $explainByItem = $result['raw']['explain'] ?? [];
+   $goldExplain = $explainByItem['gold'] ?? [];
+   // each element includes status, slot, rejectedSummary, and attempts
+
 Scenario 5: Multi-Phase Campaign
 ---------------------------------
 
@@ -119,6 +148,11 @@ Use `campaign.batch` when campaigns unfold in stages.
            ],
        ],
    ]);
+
+Note:
+
+- phases share the same `cachePool` for a single batch request by default,
+- so rule counters can carry across phases.
 
 Scenario 6: Reproducible Simulation Run
 ---------------------------------------

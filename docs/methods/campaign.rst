@@ -33,6 +33,32 @@ Signature:
 - `slot` (1-based slot index)
 - `timestamp` (current unix timestamp)
 
+Per-user allowed gifts example:
+
+.. code-block:: php
+
+   <?php
+   $allowedItemsByUser = [
+       'user_a' => ['gift_b'],
+       'user_b' => ['gift_b'],
+       'user_c' => ['*'], // wildcard = any gift
+   ];
+
+   $result = $draw->execute([
+       'method' => 'campaign.run',
+       'items' => [
+           'gift_b' => ['count' => 2, 'group' => 'b_group'],
+           'gift_c' => ['count' => 1, 'group' => 'c_group'],
+       ],
+       'candidates' => ['user_a', 'user_b', 'user_c'],
+       'options' => [
+           'eligibility' => function (string $userId, string $itemId, ?string $group, array $ctx) use ($allowedItemsByUser): bool {
+               $allowed = $allowedItemsByUser[$userId] ?? [];
+               return in_array('*', $allowed, true) || in_array($itemId, $allowed, true);
+           },
+       ],
+   ]);
+
 Item Definition (`campaign.run` and `campaign.simulate`)
 ---------------------------------------------------------
 
@@ -43,6 +69,35 @@ Items normalize into:
 - `group` (?string)
 
 `weight` is used in weighted slot scheduling before winner assignment.
+
+Accepted item shapes:
+
+`map` shape (recommended)
+   .. code-block:: php
+
+      <?php
+      'items' => [
+          'gold' => ['count' => 1, 'weight' => 2, 'group' => 'premium'],
+          'silver' => ['count' => 2, 'weight' => 1, 'group' => 'basic'],
+      ]
+
+`count shorthand`
+   .. code-block:: php
+
+      <?php
+      'items' => [
+          'gold' => 1,
+          'silver' => 2,
+      ]
+
+`list` shape (uses `item` or `name` for identifier)
+   .. code-block:: php
+
+      <?php
+      'items' => [
+          ['item' => 'gold', 'count' => 1, 'weight' => 2, 'group' => 'premium'],
+          ['name' => 'silver', 'count' => 2, 'weight' => 1, 'group' => 'basic'],
+      ]
 
 campaign.run
 ------------
@@ -61,6 +116,15 @@ Raw payload contains:
 - `partialReason`: `?string`
 - `audit`: audit artifact object
 - `explain`: per-item trace data (when `withExplain=true`)
+
+`explain` entry shape (per attempted slot):
+
+- `status`: `selected` or `exhausted`
+- `winner` (when selected)
+- `slot`
+- `eligiblePoolSize` (when selected)
+- `rejectedSummary`: reason counts
+- `attempts`: candidate-level decision trail (when enabled)
 
 Example with explanation + cache pool:
 
@@ -103,11 +167,21 @@ Phase schema:
 - `rules` (optional phase override)
 - `seed` (optional phase-specific seed)
 
+Phase `rules` can be either:
+
+- array payload (converted via `RuleSet::fromArray`), or
+- a prebuilt `RuleSet` instance.
+
 Raw payload contains:
 
 - `phases`: map of phase name to phase result
 - `partialReason`: merged dominant partial reason across phases
 - `audit`: batch-level audit artifact
+
+State behavior across phases:
+
+- the same cache pool instance is reused for all phases in one `campaign.batch` request,
+- so rule counters can carry across phases unless you provide isolated pools per request.
 
 Example:
 
@@ -174,3 +248,10 @@ If constraints or eligibility block slots:
 - `meta.fulfilled` becomes `false`
 - `meta.partialReason` is set
 - `meta.unfilledCount` reports missing slots
+
+Candidate normalization notes
+-----------------------------
+
+- Candidate IDs are trimmed.
+- Empty IDs are ignored.
+- Duplicate IDs are deduplicated before draw execution.
