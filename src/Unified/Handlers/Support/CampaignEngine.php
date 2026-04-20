@@ -212,7 +212,12 @@ final class CampaignEngine
             }
         }
 
-        return $indexToKey[array_key_last($indexToKey)] ?? '';
+        $lastIndex = array_key_last($indexToKey);
+        if (!is_int($lastIndex)) {
+            throw new DrawExhaustedException('Unable to resolve weighted item key fallback.');
+        }
+
+        return $indexToKey[$lastIndex];
     }
 
     /**
