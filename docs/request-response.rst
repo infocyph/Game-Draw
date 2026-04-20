@@ -1,13 +1,14 @@
 Request and Response Contract
 =============================
 
-Unified Request
----------------
+Unified Request Envelope
+------------------------
 
-All draw calls use:
+All draw calls use `Draw::execute(array $request)`.
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => '...',
        'items' => [...],
@@ -16,21 +17,33 @@ All draw calls use:
        'options' => [...],
    ]);
 
-Field reference:
+Field Reference
+---------------
 
-- `method` (required): draw method name.
+- `method` (required): one of supported method names.
 - `items` (required except `campaign.batch`): method-specific payload.
-- `candidates` (required for `grand` and all `campaign.*` methods): list of user IDs.
-- `sourceFile` (optional for `grand`): CSV file path alternative to `candidates`.
-- `options` (optional): method-specific options.
+- `candidates` (required for `grand` and `campaign.*`): user IDs.
+- `sourceFile` (optional for `grand`): CSV alternative to `candidates`.
+- `options` (optional): method options.
 
-Unified Response
-----------------
+Method-to-Required-Field Map
+----------------------------
+
+- `lucky`: `items`
+- flexible item methods: `items`
+- `grand`: `items` + (`candidates` or `sourceFile`)
+- `campaign.run`: `items` + `candidates`
+- `campaign.batch`: `candidates` + `options.phases`
+- `campaign.simulate`: `items` + `candidates`
+
+Unified Response Envelope
+-------------------------
 
 Every method returns:
 
 .. code-block:: php
 
+   <?php
    [
        'method' => '...',
        'entries' => [
@@ -49,35 +62,39 @@ Every method returns:
            'fulfilled' => bool,
            'partialReason' => ?string,
            'unfilledCount' => int,
+           // method-specific extra metadata may be present
        ],
    ]
 
-Metadata Semantics
-------------------
+Meta Semantics
+--------------
 
-`requestedCount`
-   How many results were requested by method/options.
+- `requestedCount`: requested slots/picks
+- `returnedCount`: produced entries
+- `fulfilled`: true when request is fully satisfied
+- `partialReason`: explanation when not fulfilled
+- `unfilledCount`: remaining slots not returned
 
-`returnedCount`
-   How many entries were actually produced.
+Common `partialReason` values:
 
-`fulfilled`
-   `true` when `returnedCount >= requestedCount`.
+- `insufficient_unique_candidates`
+- `no_eligible_candidates`
+- `unfulfilled`
 
-`partialReason`
-   `null` when fulfilled. Otherwise a reason such as:
+`raw` Payload by Method Family
+------------------------------
 
-   - `insufficient_unique_candidates`
-   - `no_eligible_candidates`
-   - `unfulfilled`
+`lucky` and flexible item methods
+   Usually list-like method output values.
 
-`unfilledCount`
-   `max(0, requestedCount - returnedCount)`.
+`grand`
+   `array<string, list<string>>` keyed by item ID.
 
-Entry Semantics
----------------
+`campaign.run`
+   `winners`, `slotPlan`, optional `explain`, `partialReason`, `audit`.
 
-- `itemId`: relevant item/prize identifier when applicable.
-- `candidateId`: selected user ID for user/campaign methods.
-- `value`: the selected value (item/user/amount/rate depending on method).
-- `meta`: entry-level method details when provided.
+`campaign.batch`
+   `phases`, `partialReason`, `audit`.
+
+`campaign.simulate`
+   `iterations`, `totalSlots`, `userDistribution`, `itemDistribution`.

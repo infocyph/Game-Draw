@@ -6,16 +6,16 @@ namespace Infocyph\Draw\Unified\Handlers;
 
 use Infocyph\Draw\Audit\AuditTrail;
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
-use Infocyph\Draw\Contracts\StateAdapterInterface;
 use Infocyph\Draw\Exceptions\ValidationException;
 use Infocyph\Draw\Random\SeededRandomGenerator;
 use Infocyph\Draw\Rules\RuleSet;
-use Infocyph\Draw\State\MemoryStateAdapter;
+use Infocyph\Draw\State\MemoryCachePool;
 use Infocyph\Draw\Support\DrawValidator;
 use Infocyph\Draw\Unified\Contracts\MethodHandlerInterface;
 use Infocyph\Draw\Unified\Handlers\Support\CampaignBatchFormatter;
 use Infocyph\Draw\Unified\Handlers\Support\CampaignEngine;
 use Infocyph\Draw\Unified\Support\ResultBuilder;
+use Psr\Cache\CacheItemPoolInterface;
 
 class CampaignMethodHandler implements MethodHandlerInterface
 {
@@ -53,7 +53,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
         $rules = RuleSet::fromArray($this->normalizeAssocArray($options['rules'] ?? [], 'options.rules'));
         $auditSecret = $this->optionalString($options['auditSecret'] ?? null) ?? '';
         $eligibility = $this->resolveEligibility($options);
-        $stateAdapter = $this->resolveStateAdapter($options);
+        $cachePool = $this->resolveCachePool($options);
         $random = $this->resolveRandom($options);
 
         return match ($method) {
@@ -64,7 +64,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
                 auditSecret: $auditSecret,
                 options: $options,
                 eligibility: $eligibility,
-                stateAdapter: $stateAdapter,
+                cachePool: $cachePool,
                 random: $random,
             ),
             'campaign.batch' => $this->runBatch(
@@ -73,7 +73,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
                 auditSecret: $auditSecret,
                 options: $options,
                 eligibility: $eligibility,
-                stateAdapter: $stateAdapter,
+                cachePool: $cachePool,
                 random: $random,
             ),
             'campaign.simulate' => $this->simulate(
@@ -236,6 +236,24 @@ class CampaignMethodHandler implements MethodHandlerInterface
     /**
      * @param array<string, mixed> $options
      */
+    private function resolveCachePool(array $options): CacheItemPoolInterface
+    {
+        $pool = $options['cachePool'] ?? null;
+        if ($pool === null) {
+            return new MemoryCachePool();
+        }
+        if (!$pool instanceof CacheItemPoolInterface) {
+            throw new ValidationException(
+                'options.cachePool must implement ' . CacheItemPoolInterface::class . '.',
+            );
+        }
+
+        return $pool;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
     private function resolveEligibility(array $options): ?callable
     {
         $eligibility = $options['eligibility'] ?? null;
@@ -274,24 +292,6 @@ class CampaignMethodHandler implements MethodHandlerInterface
     }
 
     /**
-     * @param array<string, mixed> $options
-     */
-    private function resolveStateAdapter(array $options): StateAdapterInterface
-    {
-        $adapter = $options['stateAdapter'] ?? null;
-        if ($adapter === null) {
-            return new MemoryStateAdapter();
-        }
-        if (!$adapter instanceof StateAdapterInterface) {
-            throw new ValidationException(
-                'options.stateAdapter must implement ' . StateAdapterInterface::class . '.',
-            );
-        }
-
-        return $adapter;
-    }
-
-    /**
      * @param list<string> $users
      * @param array<string, mixed> $options
      * @return array<string, mixed>
@@ -302,7 +302,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
         string $auditSecret,
         array $options,
         ?callable $eligibility,
-        StateAdapterInterface $stateAdapter,
+        CacheItemPoolInterface $cachePool,
         RandomGeneratorInterface $random,
     ): array {
         $phasesRaw = $options['phases'] ?? null;
@@ -322,7 +322,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
                 defaultRules: $defaultRules,
                 auditSecret: $auditSecret,
                 eligibility: $eligibility,
-                stateAdapter: $stateAdapter,
+                cachePool: $cachePool,
                 random: $random,
                 withExplain: $withExplain,
             );
@@ -372,7 +372,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
         RuleSet $defaultRules,
         string $auditSecret,
         ?callable $eligibility,
-        StateAdapterInterface $stateAdapter,
+        CacheItemPoolInterface $cachePool,
         RandomGeneratorInterface $random,
         bool $withExplain,
     ): array {
@@ -394,7 +394,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
             ? new SeededRandomGenerator($this->intValue($phaseRaw['seed'], 0))
             : $random;
 
-        $engine = new CampaignEngine($phaseRules, $stateAdapter, $phaseRandom, $eligibility, $withExplain);
+        $engine = new CampaignEngine($phaseRules, $cachePool, $phaseRandom, $eligibility, $withExplain);
         $phaseResult = $engine->run($users, $phaseItems);
         $phaseResult['audit'] = AuditTrail::create(
             configuration: [
@@ -426,13 +426,13 @@ class CampaignMethodHandler implements MethodHandlerInterface
         string $auditSecret,
         array $options,
         ?callable $eligibility,
-        StateAdapterInterface $stateAdapter,
+        CacheItemPoolInterface $cachePool,
         RandomGeneratorInterface $random,
     ): array {
         $withExplain = $this->boolValue($options['withExplain'] ?? false);
         $retryLimit = max(1, $this->intValue($options['retryLimit'] ?? null, 100));
 
-        $engine = new CampaignEngine($rules, $stateAdapter, $random, $eligibility, $withExplain);
+        $engine = new CampaignEngine($rules, $cachePool, $random, $eligibility, $withExplain);
         $raw = $engine->run($users, $items);
         $raw['audit'] = AuditTrail::create(
             configuration: [
@@ -497,7 +497,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
 
         for ($i = 1; $i <= $iterations; $i++) {
             $iterationRandom = new SeededRandomGenerator($seedBase + $i);
-            $engine = new CampaignEngine($rules, new MemoryStateAdapter(), $iterationRandom, $eligibility, false);
+            $engine = new CampaignEngine($rules, new MemoryCachePool(), $iterationRandom, $eligibility, false);
             $result = $engine->run($users, $items)['winners'];
 
             foreach ($result as $item => $winners) {

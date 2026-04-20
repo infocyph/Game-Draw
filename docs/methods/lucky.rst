@@ -36,6 +36,7 @@ Amount Modes
 
    .. code-block:: php
 
+      <?php
       [1, 2, 5]
 
 `weighted`
@@ -45,6 +46,7 @@ Amount Modes
 
    .. code-block:: php
 
+      <?php
       ['5' => 0.25, '10' => 0.75]
 
 `range`
@@ -54,6 +56,7 @@ Amount Modes
 
    .. code-block:: php
 
+      <?php
       '1,10,1.4'
 
    Behavior:
@@ -72,6 +75,7 @@ Example
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => 'lucky',
        'items' => [

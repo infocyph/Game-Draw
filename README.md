@@ -8,6 +8,8 @@
 
 Unified PHP draw engine with a single request/response contract for item, user, and campaign draw methods.
 
+Campaign state uses PSR-6 (`Psr\Cache\CacheItemPoolInterface`) via `options.cachePool`.
+
 ## Install
 
 Requirements:
@@ -22,6 +24,7 @@ composer require infocyph/game-draw
 ## Quick Example
 
 ```php
+<?php
 use Infocyph\Draw\Draw;
 
 $draw = new Draw();
@@ -50,10 +53,13 @@ Full documentation is in the `docs/` folder (Read the Docs format):
 
 - [Overview](docs/overview.rst)
 - [Request & Response Contract](docs/request-response.rst)
+- [Public API](docs/public-api.rst)
 - [Method Guides](docs/methods/index.rst)
 - [Rules and State](docs/rules-and-state.rst)
+- [PSR-6 Cache Integration](docs/psr6-cache.rst)
 - [Audit and Reproducibility](docs/audit-and-reproducibility.rst)
 - [Randomness Modes](docs/randomness.rst)
+- [Usage Scenarios](docs/scenarios.rst)
 - [Development](docs/development.rst)
 
 Published docs: https://docs.infocyph.com/projects/Game-Draw/

@@ -4,38 +4,44 @@ Errors and Validation
 Primary Exceptions
 ------------------
 
-- `ValidationException`: invalid input shape or unsupported values.
-- `EmptyPoolException`: method requires items/users but pool is empty.
-- `DrawExhaustedException`: weighted/pick flow could not produce a valid draw.
-- `DrawException`: generic draw exception base type.
+- `ValidationException`: invalid request payloads or unsupported method data.
+- `EmptyPoolException`: method needs items/users but pool is empty.
+- `DrawExhaustedException`: draw flow cannot produce a valid result.
+- `DrawException`: generic draw base type.
+
+PSR-6 Specific Exception
+------------------------
+
+- `InvalidCacheKeyException` implements `Psr\\Cache\\InvalidArgumentException` for invalid cache keys in the built-in memory pool.
 
 Validation Patterns
 -------------------
 
-Common validation rules enforced by handlers:
+Common checks performed by handlers:
 
 - required `method` string
-- required `items` for all methods except `campaign.batch`
-- required `candidates` for `grand` and all campaign methods
-- positive/valid weights where weighted draws apply
-- method-specific required keys in item definitions
+- required `items` where applicable
+- required `candidates` for `grand` and campaign methods
+- numeric/positive weights in weighted methods
+- method-specific required item keys
+- strict lucky `amountMode` to payload matching
 
 Partial Results vs Exceptions
 -----------------------------
 
-Not all under-fulfillment is an exception.
+Under-fulfillment is often returned as a valid response rather than thrown exception.
 
-Methods like `grand` and campaign flows can return partial success with:
+Inspect response metadata:
 
-- `meta.fulfilled = false`
-- non-null `meta.partialReason`
-- positive `meta.unfilledCount`
+- `meta.fulfilled`
+- `meta.partialReason`
+- `meta.unfilledCount`
 
 Troubleshooting Checklist
 -------------------------
 
-1. Confirm `method` is one of the supported method names.
-2. Confirm `items` shape matches that method.
-3. Confirm `candidates` or `sourceFile` is present where required.
-4. Check `meta.partialReason` when response is not fulfilled.
-5. For reproducibility issues, verify RNG mode and seeds.
+1. Confirm request method name is supported.
+2. Confirm required fields for that method are present.
+3. Confirm item schema matches method requirements.
+4. For campaign runs, verify rule constraints and eligibility callback logic.
+5. For reproducibility, verify seed usage and request fingerprints.

@@ -1,16 +1,17 @@
 Audit and Reproducibility
 =========================
 
-Audit Trail API
----------------
+AuditTrail API
+--------------
 
-Use `Infocyph\\Draw\\Audit\\AuditTrail` to create and verify deterministic draw audit artifacts.
+Use `Infocyph\\Draw\\Audit\\AuditTrail` to create and verify deterministic artifacts.
 
-Create
-------
+Create Audit
+------------
 
 .. code-block:: php
 
+   <?php
    use Infocyph\Draw\Audit\AuditTrail;
 
    $audit = AuditTrail::create(
@@ -20,11 +21,12 @@ Create
        secret: 'shared-secret',
    );
 
-Verify
-------
+Verify Audit
+------------
 
 .. code-block:: php
 
+   <?php
    $isValid = AuditTrail::verify(
        audit: $audit,
        configuration: $configuration,
@@ -33,33 +35,56 @@ Verify
        secret: 'shared-secret',
    );
 
-Signature Modes
----------------
+Audit Fields
+------------
 
-- with `secret`: `hmac-sha256`
-- without `secret`: `sha256`
+The audit object contains:
 
-Audit payload also includes `configHash` and `resultHash` (xxh3 for fast deterministic hashing) plus signature fields.
+- `generatedAt`
+- `configHash`
+- `resultHash`
+- `seedFingerprint`
+- `signatureAlgorithm`
+- `signaturePayload`
+- `signature`
 
-Request Fingerprint
--------------------
+Signature Behavior
+------------------
 
-`Draw::requestFingerprint()` creates a canonical hash of request payloads:
+- If `secret` is provided, signature uses `hmac-sha256`.
+- If no `secret` is provided, signature uses `sha256`.
+
+Request Fingerprinting
+----------------------
+
+Generate canonical request fingerprints:
 
 .. code-block:: php
 
+   <?php
    use Infocyph\Draw\Draw;
 
    $fingerprint = Draw::requestFingerprint($request);
 
-Use this for idempotency keys, simulation tracking, and audit indexing.
+This is useful for:
 
-Deterministic Runs
-------------------
+- idempotency keys,
+- replay correlation,
+- simulation grouping,
+- audit indexing.
 
-For reproducible outcomes:
+Reproducible Workflow Example
+-----------------------------
 
-- instantiate `Draw` with `SeededRandomGenerator`, or
-- pass `options.seed` on campaign methods.
+.. code-block:: php
 
-Persist both the request fingerprint and seed fingerprint to replay/verify the same scenario.
+   <?php
+   $seed = 1907;
+   $requestFingerprint = Draw::requestFingerprint($request);
+
+   $result = $draw->execute([
+       ...$request,
+       'options' => [...($request['options'] ?? []), 'seed' => $seed],
+   ]);
+
+   $audit = $result['raw']['audit'] ?? null;

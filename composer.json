@@ -16,7 +16,8 @@
     },
     "require": {
         "php": ">=8.4",
-        "ext-bcmath": "*"
+        "ext-bcmath": "*",
+        "psr/cache": "^3.0"
     },
     "require-dev": {
         "captainhook/captainhook": "^5.29.2",

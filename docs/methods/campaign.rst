@@ -12,22 +12,26 @@ Shared Inputs
 -------------
 
 - `candidates`: non-empty user ID list
-- `options.rules`: rule set (optional)
+- `options.rules`: optional `RuleSet` configuration payload
 - `options.seed`: optional deterministic RNG override
-- `options.auditSecret`: optional HMAC secret for audit signatures
-- `options.eligibility`: optional callable
-- `options.stateAdapter`: optional custom `StateAdapterInterface`
+- `options.auditSecret`: optional HMAC secret for audits
+- `options.eligibility`: optional callback filter
+- `options.cachePool`: optional PSR-6 cache pool (`CacheItemPoolInterface`)
 
-Eligibility callback signature:
+Eligibility Callback
+--------------------
+
+Signature:
 
 .. code-block:: php
 
+   <?php
    fn (string $userId, string $itemId, ?string $group, array $ctx): bool
 
-`$ctx` currently includes:
+`$ctx` contains:
 
-- `slot` (int)
-- `timestamp` (int)
+- `slot` (1-based slot index)
+- `timestamp` (current unix timestamp)
 
 Item Definition (`campaign.run` and `campaign.simulate`)
 ---------------------------------------------------------
@@ -36,9 +40,9 @@ Items normalize into:
 
 - `count` (int, default `1`)
 - `weight` (float, default `1.0`)
-- `group` (?string, optional)
+- `group` (?string)
 
-Weights are used for slot scheduling.
+`weight` is used in weighted slot scheduling before winner assignment.
 
 campaign.run
 ------------
@@ -50,17 +54,20 @@ Options:
 - `withExplain` (bool, default `false`)
 - `retryLimit` (int, default `100`, compatibility metadata)
 
-Raw output includes:
+Raw payload contains:
 
-- `winners`
-- `slotPlan`
-- `partialReason`
-- `explain` (when enabled)
-- `audit`
+- `winners`: `array<string, list<string>>`
+- `slotPlan`: `list<array{itemId: string, group: ?string}>`
+- `partialReason`: `?string`
+- `audit`: audit artifact object
+- `explain`: per-item trace data (when `withExplain=true`)
 
-Example:
+Example with explanation + cache pool:
 
 .. code-block:: php
+
+   <?php
+   use Infocyph\Draw\State\MemoryCachePool;
 
    $result = $draw->execute([
        'method' => 'campaign.run',
@@ -70,6 +77,7 @@ Example:
        ],
        'candidates' => ['u1', 'u2', 'u3', 'u4'],
        'options' => [
+           'cachePool' => new MemoryCachePool(),
            'rules' => [
                'perUserCap' => 1,
                'perItemCap' => ['gold' => 1],
@@ -77,33 +85,50 @@ Example:
            ],
            'withExplain' => true,
            'seed' => 12345,
+           'auditSecret' => 'shared-secret',
        ],
    ]);
 
 campaign.batch
 --------------
 
-Runs campaign phases in sequence from `options.phases`.
+Runs campaign phases sequentially.
+
+`campaign.batch` does not require top-level `items`; it expects `options.phases`.
 
 Phase schema:
 
 - `name` (optional)
 - `items` (required)
-- `rules` (optional; overrides default rules)
-- `seed` (optional; phase-specific deterministic seed)
+- `rules` (optional phase override)
+- `seed` (optional phase-specific seed)
+
+Raw payload contains:
+
+- `phases`: map of phase name to phase result
+- `partialReason`: merged dominant partial reason across phases
+- `audit`: batch-level audit artifact
 
 Example:
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => 'campaign.batch',
        'candidates' => ['u1', 'u2', 'u3', 'u4'],
        'options' => [
            'rules' => ['perUserCap' => 1],
            'phases' => [
-               ['name' => 'phase_1', 'items' => ['item_a' => ['count' => 2]]],
-               ['name' => 'phase_2', 'items' => ['item_b' => ['count' => 2]]],
+               [
+                   'name' => 'phase_1',
+                   'items' => ['item_a' => ['count' => 2, 'weight' => 2]],
+               ],
+               [
+                   'name' => 'phase_2',
+                   'items' => ['item_b' => ['count' => 2, 'weight' => 1]],
+                   'seed' => 908,
+               ],
            ],
        ],
    ]);
@@ -111,7 +136,7 @@ Example:
 campaign.simulate
 -----------------
 
-Monte Carlo style repeated campaign runs using seeded iterations.
+Performs Monte Carlo-style simulation over repeated campaign executions.
 
 Options:
 
@@ -119,24 +144,33 @@ Options:
 - `seed` (int, default `0`)
 - `retryLimit` (compatibility metadata)
 
-Returns aggregate distributions:
+Raw payload contains:
 
-- `userDistribution`
-- `itemDistribution`
+- `iterations`
 - `totalSlots`
+- `userDistribution` with `wins`, `rate`, and `ci95`
+- `itemDistribution` with `wins`, `avgPerIteration`
 
 Example:
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => 'campaign.simulate',
-       'items' => ['gold' => ['count' => 1], 'silver' => ['count' => 2]],
+       'items' => [
+           'gold' => ['count' => 1, 'weight' => 2],
+           'silver' => ['count' => 2, 'weight' => 1],
+       ],
        'candidates' => ['u1', 'u2', 'u3', 'u4'],
-       'options' => ['iterations' => 1000, 'seed' => 42],
+       'options' => ['iterations' => 2000, 'seed' => 42],
    ]);
 
-Partial Results
----------------
+Partial Fulfillment
+-------------------
 
-If constraints or eligibility block slots, campaign responses expose partial metadata through the standard response `meta` fields.
+If constraints or eligibility block slots:
+
+- `meta.fulfilled` becomes `false`
+- `meta.partialReason` is set
+- `meta.unfilledCount` reports missing slots

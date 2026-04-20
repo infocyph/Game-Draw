@@ -48,6 +48,7 @@ Example
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => 'grand',
        'items' => ['gift_a' => 5, 'gift_b' => 2],
@@ -60,6 +61,7 @@ CSV Source Example
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => 'grand',
        'items' => ['gift_a' => 2],
