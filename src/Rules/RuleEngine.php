@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Infocyph\Draw\Rules;
 
-use Infocyph\Draw\Contracts\StateAdapterInterface;
+use Psr\Cache\CacheItemPoolInterface;
 
 class RuleEngine
 {
     public function __construct(
         private readonly RuleSet $rules,
-        private readonly StateAdapterInterface $stateAdapter,
+        private readonly CacheItemPoolInterface $cachePool,
     ) {}
 
     /**
@@ -50,15 +50,28 @@ class RuleEngine
 
     public function record(string $userId, string $itemId, ?string $group, int $timestamp): void
     {
-        $this->stateAdapter->increment($this->userWinsKey($userId));
-        $this->stateAdapter->increment($this->itemWinsKey($itemId));
-        $group !== null && $this->stateAdapter->increment($this->groupWinsKey($group));
-        $this->stateAdapter->set($this->userLastWinKey($userId), $timestamp);
+        $this->incrementKey($this->userWinsKey($userId));
+        $this->incrementKey($this->itemWinsKey($itemId));
+        if ($group !== null) {
+            $this->incrementKey($this->groupWinsKey($group));
+        }
+        $this->setKeyValue($this->userLastWinKey($userId), $timestamp);
     }
 
     private function groupWinsKey(string $group): string
     {
         return "rules.group_wins.{$group}";
+    }
+
+    private function incrementKey(string $key, int $by = 1): int
+    {
+        $item = $this->cachePool->getItem($key);
+        $current = $item->isHit() ? $this->readRawInt($item->get()) : 0;
+        $updated = $current + $by;
+        $item->set($updated);
+        $this->cachePool->save($item);
+
+        return $updated;
     }
 
     private function itemWinsKey(string $itemId): string
@@ -68,7 +81,12 @@ class RuleEngine
 
     private function readInt(string $key): int
     {
-        $value = $this->stateAdapter->get($key, 0);
+        $item = $this->cachePool->getItem($key);
+        if (!$item->isHit()) {
+            return 0;
+        }
+
+        $value = $item->get();
 
         return match (true) {
             is_int($value) => $value,
@@ -76,6 +94,23 @@ class RuleEngine
             is_string($value) && is_numeric($value) => (int) $value,
             default => 0,
         };
+    }
+
+    private function readRawInt(mixed $value): int
+    {
+        return match (true) {
+            is_int($value) => $value,
+            is_float($value) => (int) $value,
+            is_string($value) && is_numeric($value) => (int) $value,
+            default => 0,
+        };
+    }
+
+    private function setKeyValue(string $key, mixed $value): void
+    {
+        $item = $this->cachePool->getItem($key);
+        $item->set($value);
+        $this->cachePool->save($item);
     }
 
     private function userLastWinKey(string $userId): string

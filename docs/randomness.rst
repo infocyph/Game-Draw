@@ -1,10 +1,10 @@
 Randomness Modes
 ================
 
-Random Generator Interface
---------------------------
+Random Interface
+----------------
 
-All randomness is abstracted behind `RandomGeneratorInterface`:
+All randomness is abstracted by `RandomGeneratorInterface`:
 
 - `float(): float`
 - `int(int $min, int $max): int`
@@ -15,24 +15,26 @@ Built-in Generators
 -------------------
 
 `SecureRandomGenerator`
-   Cryptographically secure source (default in `Draw`).
+   Cryptographically secure random source. Used by default in `Draw`.
 
 `SeededRandomGenerator`
-   Deterministic pseudo-random source (MT19937) for repeatable tests/simulations.
+   Deterministic random source for reproducible tests/simulations.
 
-Usage Examples
---------------
+Usage
+-----
 
 Default secure mode:
 
 .. code-block:: php
 
+   <?php
    $draw = new \Infocyph\Draw\Draw();
 
 Deterministic global mode:
 
 .. code-block:: php
 
+   <?php
    use Infocyph\Draw\Draw;
    use Infocyph\Draw\Random\SeededRandomGenerator;
 
@@ -42,6 +44,7 @@ Campaign deterministic override:
 
 .. code-block:: php
 
+   <?php
    $result = $draw->execute([
        'method' => 'campaign.run',
        'items' => [...],
@@ -49,8 +52,10 @@ Campaign deterministic override:
        'options' => ['seed' => 12345],
    ]);
 
-Guidance
---------
+Seed Fingerprints
+-----------------
 
-- Use secure RNG for production fairness.
-- Use seeded RNG for reproducibility, regression tests, and simulation analysis.
+- `SecureRandomGenerator::seedFingerprint()` returns `null`.
+- `SeededRandomGenerator::seedFingerprint()` returns a deterministic fingerprint.
+
+This fingerprint is included in campaign audit payloads when available.

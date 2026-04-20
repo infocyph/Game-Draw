@@ -15,53 +15,55 @@ Method Names
 - `sequential`
 - `rangeWeighted`
 
-Common Options
+Shared Options
 --------------
 
-- `count` (int, default `1`): number of draws
-- `check` (bool, default `true`): validate required fields by method
+- `count` (int, default `1`)
+- `check` (bool, default `true`)
 
-`batched`-specific option:
+Additional option:
 
-- `withReplacement` (bool, default `false`)
+- `withReplacement` applies to `batched` only (default `false`)
 
-Method Requirements and Behavior
---------------------------------
+Method Requirements and Semantics
+---------------------------------
 
 `probability`
-   Required fields per item: `name`, `weight`
+   Required item keys: `name`, `weight`
 
-   Picks by normalized weight with replacement.
+   Weighted draw with replacement.
 
 `elimination`
-   Required fields per item: `name`
+   Required item keys: `name`
 
-   Picks uniformly and removes picked item.
+   Uniform draw without replacement.
 
 `weightedElimination`
-   Required fields per item: `name`, `weight`
+   Required item keys: `name`, `weight`
 
-   Picks by weight and removes picked item.
+   Weighted draw without replacement.
 
 `roundRobin`
-   Required fields per item: `name`
+   Required item keys: `name`
 
-   Cycles through item list in order.
+   Cycles through items in deterministic order.
 
 `cumulative`
-   Required fields per item: `name`
+   Required item keys: `name`
 
-   Maintains cumulative scores and picks strongest candidate each round.
+   Maintains cumulative scores and picks highest score each step.
 
 `batched`
-   Required fields per item: `name`
+   Required item keys: `name`
 
-   Performs `count` picks in one batch; replacement controlled by `withReplacement`.
+   Batch draw for `count` picks, replacement controlled by `withReplacement`.
 
 `timeBased`
-   Required fields per item: `name`, `weight`, `time`
+   Required item keys: `name`, `weight`, `time`
 
-   Applies urgency boost from elapsed time since last pick. Supported `time` values:
+   Applies urgency boost based on elapsed time since last pick.
+
+   Supported `time` values:
 
    - `minute`
    - `hourly`
@@ -69,32 +71,63 @@ Method Requirements and Behavior
    - `weekly`
    - `monthly`
 
-   Unknown values fall back to `daily` behavior.
-
 `weightedBatch`
-   Required fields per item: `name`, `weight`
+   Required item keys: `name`, `weight`
 
-   Batch variant of weighted probability selection.
+   Batch variant of weighted probability draw.
 
 `sequential`
-   Required fields per item: `name`
+   Required item keys: `name`
 
-   Deterministic index-based cycling.
+   Deterministic sequential traversal.
 
 `rangeWeighted`
-   Required fields per item: `name`, `min`, `max`, `weight`
+   Required item keys: `name`, `min`, `max`, `weight`
 
-   Draws a range by weight, then samples inside range.
+   Chooses a range by weight then samples in that range.
 
-   - returns integer when both boundaries are integers
-   - returns float otherwise
+   Return type behavior:
 
-Flexible Examples
------------------
+   - integer result when both `min` and `max` are integers
+   - float result otherwise
+
+Examples
+--------
+
+Probability:
 
 .. code-block:: php
 
-   // weighted elimination
+   <?php
+   $result = $draw->execute([
+       'method' => 'probability',
+       'items' => [
+           ['name' => 'item1', 'weight' => 0.2],
+           ['name' => 'item2', 'weight' => 0.8],
+       ],
+       'options' => ['count' => 3],
+   ]);
+
+Elimination:
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'elimination',
+       'items' => [
+           ['name' => 'item1'],
+           ['name' => 'item2'],
+           ['name' => 'item3'],
+       ],
+       'options' => ['count' => 2],
+   ]);
+
+Weighted Elimination:
+
+.. code-block:: php
+
+   <?php
    $result = $draw->execute([
        'method' => 'weightedElimination',
        'items' => [
@@ -104,9 +137,96 @@ Flexible Examples
        'options' => ['count' => 2],
    ]);
 
+Round Robin:
+
 .. code-block:: php
 
-   // range weighted
+   <?php
+   $result = $draw->execute([
+       'method' => 'roundRobin',
+       'items' => [
+           ['name' => 'item1'],
+           ['name' => 'item2'],
+       ],
+       'options' => ['count' => 4],
+   ]);
+
+Cumulative:
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'cumulative',
+       'items' => [
+           ['name' => 'item1'],
+           ['name' => 'item2'],
+       ],
+       'options' => ['count' => 3],
+   ]);
+
+Batched (without replacement):
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'batched',
+       'items' => [
+           ['name' => 'item1'],
+           ['name' => 'item2'],
+           ['name' => 'item3'],
+       ],
+       'options' => ['count' => 2, 'withReplacement' => false],
+   ]);
+
+Time Based:
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'timeBased',
+       'items' => [
+           ['name' => 'item1', 'weight' => 10, 'time' => 'daily'],
+           ['name' => 'item2', 'weight' => 20, 'time' => 'weekly'],
+       ],
+       'options' => ['count' => 2],
+   ]);
+
+Weighted Batch:
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'weightedBatch',
+       'items' => [
+           ['name' => 'item1', 'weight' => 10],
+           ['name' => 'item2', 'weight' => 20],
+       ],
+       'options' => ['count' => 3],
+   ]);
+
+Sequential:
+
+.. code-block:: php
+
+   <?php
+   $result = $draw->execute([
+       'method' => 'sequential',
+       'items' => [
+           ['name' => 'item1'],
+           ['name' => 'item2'],
+       ],
+       'options' => ['count' => 3],
+   ]);
+
+Range Weighted:
+
+.. code-block:: php
+
+   <?php
    $result = $draw->execute([
        'method' => 'rangeWeighted',
        'items' => [

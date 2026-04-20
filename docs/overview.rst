@@ -4,35 +4,51 @@ Overview
 What Game Draw Solves
 ---------------------
 
-Game Draw gives you a single entrypoint (`Infocyph\\Draw\\Draw`) for multiple draw strategies while keeping:
+Game Draw provides a single, consistent draw API for:
 
-- a shared request envelope,
-- a shared response envelope,
-- injectable random generation,
-- campaign rule/state controls,
-- and optional audit verification.
+- weighted item rewards,
+- unique user winner allocation,
+- and rule-aware campaign flows.
 
-Core Design
------------
+It standardizes request/response shapes so integrations do not need per-method transport contracts.
 
-The package routes requests by `method` into specialized handlers:
+Architecture at a Glance
+------------------------
 
-- `LuckyMethodHandler` for `lucky`
-- `ItemMethodHandler` for flexible item methods
-- `UserMethodHandler` for `grand`
-- `CampaignMethodHandler` for `campaign.run`, `campaign.batch`, `campaign.simulate`
+`Draw`
+   Public entrypoint and router by `method`.
 
-Every handler returns a standardized response shape via `ResultBuilder`.
+`LuckyMethodHandler`
+   Handles `lucky` weighted item + amount-mode draws.
+
+`ItemMethodHandler`
+   Handles non-campaign item methods (`probability`, `elimination`, etc.).
+
+`UserMethodHandler`
+   Handles `grand` user winner allocation.
+
+`CampaignMethodHandler`
+   Handles `campaign.run`, `campaign.batch`, `campaign.simulate`.
+
+`CampaignEngine`
+   Internal slot planning, eligibility filtering, and winner selection.
+
+`RuleEngine` + `RuleSet`
+   Rule decisions and state tracking.
+
+`AuditTrail`
+   Request/result fingerprinting and signature verification helpers.
+
+`ResultBuilder`
+   Produces standardized response envelope and fulfillment metadata.
 
 Method Families
 ---------------
 
 `lucky`
-   Weighted item selection plus configurable amount generation modes (`list`, `weighted`, `range`).
+   Weighted item pick with amount modes: `list`, `weighted`, `range`.
 
-Item methods
-   Non-campaign item draws:
-
+Flexible item methods
    - `probability`
    - `elimination`
    - `weightedElimination`
@@ -45,27 +61,17 @@ Item methods
    - `rangeWeighted`
 
 `grand`
-   Draws winners from user candidates across prize counts using a no-replacement pool.
+   Unique user allocation from a candidate pool.
 
 Campaign methods
-   Rule-aware user allocation per item slot:
-
    - `campaign.run`
    - `campaign.batch`
    - `campaign.simulate`
 
-High-Level Guarantees
----------------------
+Core Guarantees
+---------------
 
-- Consistent response metadata:
-
-  - `requestedCount`
-  - `returnedCount`
-  - `fulfilled`
-  - `partialReason`
-  - `unfilledCount`
-
-- Pool-based unique user selection for `grand`
-- Weighted campaign item slot scheduling in campaign flows
-- Audit creation and verification helpers
-- Deterministic reproducibility support through seeded RNG and request fingerprints
+- unified response metadata across all methods,
+- partial fulfillment visibility (`fulfilled`, `partialReason`, `unfilledCount`),
+- deterministic reproducibility when seeded,
+- and audit verification helpers for integrity workflows.

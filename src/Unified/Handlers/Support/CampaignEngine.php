@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Infocyph\Draw\Unified\Handlers\Support;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
-use Infocyph\Draw\Contracts\StateAdapterInterface;
 use Infocyph\Draw\Exceptions\DrawExhaustedException;
 use Infocyph\Draw\Flexible\Support\WeightTools;
 use Infocyph\Draw\Rules\RuleEngine;
 use Infocyph\Draw\Rules\RuleSet;
+use Psr\Cache\CacheItemPoolInterface;
 
 final class CampaignEngine
 {
@@ -22,13 +22,13 @@ final class CampaignEngine
 
     public function __construct(
         private readonly RuleSet $rules,
-        private readonly StateAdapterInterface $stateAdapter,
+        private readonly CacheItemPoolInterface $cachePool,
         private readonly RandomGeneratorInterface $random,
         ?callable $eligibility,
         private readonly bool $withExplain,
     ) {
         $this->eligibility = $eligibility;
-        $this->ruleEngine = new RuleEngine($this->rules, $this->stateAdapter);
+        $this->ruleEngine = new RuleEngine($this->rules, $this->cachePool);
     }
 
     /**

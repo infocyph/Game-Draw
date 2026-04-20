@@ -4,11 +4,13 @@ Installation
 Requirements
 ------------
 
-- PHP 8.4 or newer
+- PHP 8.4+
 - `ext-bcmath`
 
-Install with Composer
----------------------
+Package dependencies include PSR-6 cache interfaces (`psr/cache`) for campaign state handling.
+
+Install
+-------
 
 .. code-block:: bash
 
@@ -19,6 +21,7 @@ Import
 
 .. code-block:: php
 
+   <?php
    use Infocyph\Draw\Draw;
 
    $draw = new Draw();
@@ -26,6 +29,7 @@ Import
 Next Steps
 ----------
 
-- Start with :doc:`quickstart`
-- Then review :doc:`request-response`
-- For production campaign setups, continue with :doc:`rules-and-state`
+- :doc:`quickstart`
+- :doc:`request-response`
+- :doc:`methods/index`
+- :doc:`psr6-cache`

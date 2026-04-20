@@ -4,6 +4,7 @@ use Infocyph\Draw\Audit\AuditTrail;
 use Infocyph\Draw\Draw;
 use Infocyph\Draw\Exceptions\ValidationException;
 use Infocyph\Draw\Random\SeededRandomGenerator;
+use Infocyph\Draw\State\MemoryCachePool;
 
 test('grand fully fills from remaining pool even with retryCount set to one', function () {
     $draw = new Draw(new SeededRandomGenerator(701));
@@ -93,6 +94,23 @@ test('campaign batch accepts requests without top-level items', function () {
 
     expect($result['method'])->toBe('campaign.batch')
         ->and($result['entries'])->toHaveCount(2);
+});
+
+test('campaign accepts a psr-6 cache pool', function () {
+    $draw = new Draw(new SeededRandomGenerator(7041));
+    $result = $draw->execute([
+        'method' => 'campaign.run',
+        'items' => ['gift' => ['count' => 1]],
+        'candidates' => ['u1', 'u2'],
+        'options' => [
+            'cachePool' => new MemoryCachePool(),
+            'rules' => ['perUserCap' => 1],
+        ],
+    ]);
+
+    expect($result['method'])->toBe('campaign.run')
+        ->and($result['entries'])->toHaveCount(1)
+        ->and($result['meta']['fulfilled'])->toBeTrue();
 });
 
 test('rangeWeighted returns integer values for integer bounds', function () {
