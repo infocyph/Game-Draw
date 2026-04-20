@@ -1,10 +1,12 @@
 # Game Draw (v4)
 
 [![Security & Standards](https://github.com/infocyph/Game-Draw/actions/workflows/build.yml/badge.svg)](https://github.com/infocyph/Game-Draw/actions/workflows/build.yml)
-[![Documentation](https://img.shields.io/badge/Documentation-Read%20the%20Docs-blue?logo=readthedocs&logoColor=white)](https://docs.infocyph.com/projects/Game-Draw/)
-![Packagist Version](https://img.shields.io/packagist/v/infocyph/Game-Draw)
-![Packagist Downloads](https://img.shields.io/packagist/dt/infocyph/Game-Draw)
+[![Documentation](https://img.shields.io/badge/Documentation-Game-Draw-blue?logo=readthedocs&logoColor=white)](https://docs.infocyph.com/projects/Game-Draw/)
+![Packagist Downloads](https://img.shields.io/packagist/dt/infocyph/Game-Draw?color=green&link=https%3A%2F%2Fpackagist.org%2Fpackages%2Finfocyph%2FGame-Draw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+![Packagist Version](https://img.shields.io/packagist/v/infocyph/Game-Draw)
+![Packagist PHP Version](https://img.shields.io/packagist/dependency-v/infocyph/Game-Draw/php)
+![GitHub Code Size](https://img.shields.io/github/languages/code-size/infocyph/Game-Draw)
 
 Unified PHP draw engine with a single request/response contract for item, user, and campaign draw methods.
 
@@ -48,18 +50,5 @@ $result = $draw->execute([
 - `campaign.run`, `campaign.batch`, `campaign.simulate`
 
 ## Documentation
-
-Full documentation is in the `docs/` folder (Read the Docs format):
-
-- [Overview](docs/overview.rst)
-- [Request & Response Contract](docs/request-response.rst)
-- [Public API](docs/public-api.rst)
-- [Method Guides](docs/methods/index.rst)
-- [Rules and State](docs/rules-and-state.rst)
-- [PSR-6 Cache Integration](docs/psr6-cache.rst)
-- [Audit and Reproducibility](docs/audit-and-reproducibility.rst)
-- [Randomness Modes](docs/randomness.rst)
-- [Usage Scenarios](docs/scenarios.rst)
-- [Development](docs/development.rst)
 
 Published docs: https://docs.infocyph.com/projects/Game-Draw/

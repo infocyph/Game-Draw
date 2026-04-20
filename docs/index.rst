@@ -21,4 +21,3 @@ Use this documentation as the primary reference for integration, behavior detail
    randomness
    scenarios
    errors-and-validation
-   development
