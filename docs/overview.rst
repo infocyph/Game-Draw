@@ -75,3 +75,11 @@ Core Guarantees
 - partial fulfillment visibility (`fulfilled`, `partialReason`, `unfilledCount`),
 - deterministic reproducibility when seeded,
 - and audit verification helpers for integrity workflows.
+
+Where to Find Specific Guidance
+-------------------------------
+
+- Per-method behavior: :doc:`methods/index`
+- Request/response contract and option matrix: :doc:`request-response`
+- Campaign rule state storage (PSR-6): :doc:`psr6-cache`
+- End-to-end usage patterns: :doc:`scenarios`
