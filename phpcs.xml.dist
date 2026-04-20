@@ -18,25 +18,39 @@
     <exclude-pattern>*/.git/*</exclude-pattern>
     <exclude-pattern>*/.idea/*</exclude-pattern>
 
+    <!-- Commenting and naming -->
     <rule ref="Generic.Commenting.Fixme"/>
     <rule ref="Generic.Commenting.Todo"/>
     <rule ref="Generic.NamingConventions.UpperCaseConstantName"/>
-    <rule ref="Generic.CodeAnalysis.RequireExplicitBooleanOperatorPrecedence"/>
-    <rule ref="Generic.PHP.BacktickOperator"/>
-    <rule ref="Generic.PHP.DeprecatedFunctions"/>
-    <rule ref="Generic.VersionControl.GitMergeConflict"/>
-    <rule ref="Squiz.PHP.NonExecutableCode"/>
 
+    <!-- Code quality and safety -->
+    <rule ref="Generic.CodeAnalysis.RequireExplicitBooleanOperatorPrecedence"/>
+    <rule ref="Generic.CodeAnalysis.UnusedFunctionParameter"/>
     <rule ref="Generic.CodeAnalysis.EmptyStatement">
         <exclude name="Generic.CodeAnalysis.EmptyStatement.DetectedCatch"/>
     </rule>
+    <rule ref="Squiz.PHP.NonExecutableCode"/>
 
+    <!-- PHP safety -->
+    <rule ref="Generic.PHP.BacktickOperator"/>
+    <rule ref="Generic.PHP.DeprecatedFunctions"/>
+    <rule ref="Generic.PHP.NoSilencedErrors"/>
+    <rule ref="Generic.PHP.DisallowShortOpenTag"/>
+
+    <!-- Version control -->
+    <rule ref="Generic.VersionControl.GitMergeConflict"/>
+
+    <!-- File consistency -->
+    <rule ref="Generic.Files.LineEndings"/>
+
+    <!-- Forbidden functions -->
     <rule ref="Generic.PHP.ForbiddenFunctions">
         <properties>
             <property name="forbiddenFunctions" type="array">
                 <element key="echo" value="null"/>
                 <element key="print" value="null"/>
                 <element key="die" value="null"/>
+                <element key="exit" value="null"/>
                 <element key="eval" value="null"/>
                 <element key="sleep" value="null"/>
                 <element key="print_r" value="null"/>

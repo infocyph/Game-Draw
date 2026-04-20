@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Unified\Contracts;
 
 interface MethodHandlerInterface
@@ -14,11 +16,15 @@ interface MethodHandlerInterface
      *
      * Unified response:
      * - method: string
-     * - entries: array<int, array{itemId: ?string, candidateId: ?string, value: mixed, meta: array}>
+     * - entries: array<int, array{itemId: ?string, candidateId: ?string, value: mixed, meta: array<string, mixed>}>
      * - raw: mixed
-     * - meta: array
+     * - meta: array<string, mixed>
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
      */
     public function execute(array $request): array;
+
     /**
      * @return array<int, string>
      */

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Exceptions\EmptyPoolException;
@@ -12,7 +14,7 @@ class RoundRobinDraw
             throw new EmptyPoolException('No items left to draw.');
         }
 
-        $pickedItem = $state->items[$state->rrdIndex]['name'];
+        $pickedItem = $state->itemName($state->rrdIndex);
         $state->rrdIndex = ($state->rrdIndex + 1) % count($state->items);
 
         return $pickedItem;

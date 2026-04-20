@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
+use Infocyph\Draw\Exceptions\DrawExhaustedException;
 use Infocyph\Draw\Exceptions\ValidationException;
 use Infocyph\Draw\Flexible\Support\WeightTools;
 
@@ -12,21 +15,24 @@ class ProbabilityDraw
 
     public function draw(FlexibleState $state): string
     {
-        [$weights, $totalWeight] = WeightTools::prepare($state->items);
+        $weightsInput = [];
+        foreach (array_keys($state->items) as $index) {
+            $weightsInput[] = ['weight' => $state->itemWeight($index)];
+        }
+
+        [$weights, $totalWeight] = WeightTools::prepare($weightsInput);
         if ($totalWeight <= 0) {
-            throw new ValidationException("Total weight must be greater than zero.");
+            throw new ValidationException('Total weight must be greater than zero.');
         }
 
         $randomWeight = $this->random->int(1, $totalWeight);
         foreach ($weights as $weight) {
             $randomWeight -= $weight['weight'];
             if ($randomWeight <= 0) {
-                return $state->items[$weight['index']]['name'];
+                return $state->itemName($weight['index']);
             }
         }
 
-        $items = array_column($weights, 'weight', 'index');
-        $index = array_search(max($items), $items, true);
-        return $state->items[$index]['name'];
+        throw new DrawExhaustedException('Probability draw failed unexpectedly.');
     }
 }

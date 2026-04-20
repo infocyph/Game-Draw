@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
@@ -16,8 +18,8 @@ class EliminationDraw
         }
 
         $index = $this->random->pickArrayKey($state->items);
-        $pickedItem = $state->items[$index]['name'];
-        unset($state->items[$index]);
+        $pickedItem = $state->itemName($index);
+        $state->removeItem($index);
 
         return $pickedItem;
     }

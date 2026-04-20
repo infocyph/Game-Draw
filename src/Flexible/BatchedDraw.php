@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
@@ -10,16 +12,19 @@ class BatchedDraw
 {
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
+    /**
+     * @return list<string>
+     */
     public function draw(FlexibleState $state, int $count, bool $withReplacement): array
     {
         if ($count <= 0) {
-            throw new ValidationException("Count must be a positive integer.");
+            throw new ValidationException('Count must be a positive integer.');
         }
 
         $pickedItems = [];
         for ($i = 0; $i < $count && !empty($state->items); $i++) {
             $pickedItems[] = $withReplacement
-                ? $state->items[$this->random->pickArrayKey($state->items)]['name']
+                ? $state->itemName($this->random->pickArrayKey($state->items))
                 : $this->pickWithoutReplacement($state);
         }
 
@@ -33,8 +38,9 @@ class BatchedDraw
         }
 
         $index = $this->random->pickArrayKey($state->items);
-        $pickedItem = $state->items[$index]['name'];
-        unset($state->items[$index]);
+        $pickedItem = $state->itemName($index);
+        $state->removeItem($index);
+
         return $pickedItem;
     }
 }

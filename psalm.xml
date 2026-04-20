@@ -4,6 +4,11 @@
     xmlns="https://getpsalm.org/schema/config"
     xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
     errorLevel="2"
+    findUnusedCode="true"
+    findUnusedPsalmSuppress="true"
+    runTaintAnalysis="true"
+    reportInfo="true"
+    checkForThrowsDocblock="true"
 >
     <projectFiles>
         <directory name="src" />
@@ -13,9 +18,7 @@
         </ignoreFiles>
     </projectFiles>
 
-    <!-- Security-focused issue handlers -->
     <issueHandlers>
-        <!-- CRITICAL SECURITY ISSUES - Report as errors -->
         <TaintedInput errorLevel="error" />
         <TaintedSql errorLevel="error" />
         <TaintedShell errorLevel="error" />
@@ -25,16 +28,12 @@
         <TaintedUnserialize errorLevel="error" />
         <TaintedEval errorLevel="error" />
         <TaintedFile errorLevel="error" />
+        <TaintedSSRF errorLevel="error" />
 
-        <!-- HIGH SECURITY ISSUES -->
-        <TaintedSSRF errorLevel="info" />
-
-        <!-- Dead-code reporting for library APIs (informational by default) -->
         <UnusedClass errorLevel="error" />
         <UnusedConstructor errorLevel="info" />
         <PossiblyUnusedMethod errorLevel="info" />
         <PossiblyUnusedProperty errorLevel="info" />
         <PossiblyUnusedReturnValue errorLevel="info" />
     </issueHandlers>
-
 </psalm>

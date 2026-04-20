@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Unified\Handlers;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
@@ -23,28 +25,40 @@ class ItemMethodHandler implements MethodHandlerInterface
 {
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
     public function execute(array $request): array
     {
-        $method = (string) ($request['method'] ?? '');
-        $items = $request['items'] ?? null;
-        $options = $request['options'] ?? [];
+        $methodRaw = $request['method'] ?? null;
+        if (!is_string($methodRaw)) {
+            throw new ValidationException('method is required and must be a string.');
+        }
+        $method = trim($methodRaw);
 
-        if (!is_array($items) || empty($items)) {
+        $items = $request['items'] ?? null;
+        $optionsRaw = $request['options'] ?? [];
+        if (!is_array($items) || $items === []) {
             throw new ValidationException('items is required and must be a non-empty array.');
         }
-        if (!is_array($options)) {
+        if (!is_array($optionsRaw)) {
             throw new ValidationException('options must be an array when provided.');
         }
 
-        return $method === 'lucky'
-            ? $this->executeLucky($items, $options)
-            : $this->executeFlexible($method, $items, $options);
+        if (!in_array($method, $this->methods(), true)) {
+            throw new ValidationException("Unsupported item draw method: {$method}");
+        }
+
+        $options = $this->normalizeAssocArray($optionsRaw, 'options');
+        $normalizedItems = $this->normalizeItems($items);
+
+        return $this->executeFlexible($method, $normalizedItems, $options);
     }
 
     public function methods(): array
     {
         return [
-            'lucky',
             'probability',
             'elimination',
             'weightedElimination',
@@ -58,9 +72,22 @@ class ItemMethodHandler implements MethodHandlerInterface
         ];
     }
 
+    private function boolValue(mixed $value): bool
+    {
+        return match (true) {
+            is_bool($value) => $value,
+            is_int($value) => $value !== 0,
+            is_string($value) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            default => (bool) $value,
+        };
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     */
     private function checkFlexible(array $items, string $method): void
     {
-        DrawValidator::assertNotEmpty($items, "Items array must contain at least one item.");
+        DrawValidator::assertNotEmpty($items, 'Items array must contain at least one item.');
 
         $requiredKeys = match ($method) {
             'weightedElimination', 'probability', 'weightedBatch' => ['name' => true, 'weight' => true],
@@ -69,77 +96,85 @@ class ItemMethodHandler implements MethodHandlerInterface
             default => ['name' => true],
         };
 
-        DrawValidator::assertRequiredKeys($items, $requiredKeys, "Item");
-        foreach ($items as $item) {
-            if ($method === 'rangeWeighted' && $item['min'] >= $item['max']) {
+        DrawValidator::assertRequiredKeys($items, $requiredKeys, 'Item');
+        if ($method !== 'rangeWeighted') {
+            return;
+        }
+
+        foreach ($items as $index => $item) {
+            $min = $this->numericAsFloat($item['min'] ?? null, "Item at index {$index} min");
+            $max = $this->numericAsFloat($item['max'] ?? null, "Item at index {$index} max");
+            if ($min >= $max) {
                 throw new ValidationException("For rangeWeighted draw, 'min' should be less than 'max'.");
             }
         }
     }
 
-    private function checkLucky(array $items): void
-    {
-        DrawValidator::assertNotEmpty($items, 'Items array must contain at least one item.');
-        DrawValidator::assertRequiredKeys(
-            $items,
-            ['item' => true, 'chances' => true, 'amounts' => true],
-            'Item',
-        );
+    /**
+     * @return list<string>
+     */
+    private function drawFlexibleBatch(
+        string $method,
+        FlexibleState $state,
+        int $count,
+        bool $withReplacement,
+    ): array {
+        return match ($method) {
+            'batched' => new BatchedDraw($this->random)->draw($state, $count, $withReplacement),
+            'weightedBatch' => new WeightedBatchDraw(new ProbabilityDraw($this->random))->draw($state, $count),
+            default => throw new ValidationException("Unsupported batch-capable method: {$method}"),
+        };
     }
 
-    private function drawWeighted(array $items): string
+    private function drawFlexibleSingle(string $method, FlexibleState $state): string|float|int
     {
-        if (count($items) === 1) {
-            return (string) key($items);
-        }
-
-        $random = $this->random->int(1, array_sum($items));
-        foreach ($items as $key => $value) {
-            $random -= (int) $value;
-            if ($random <= 0) {
-                return (string) $key;
-            }
-        }
-
-        return (string) array_search(max($items), $items, true);
+        return match ($method) {
+            'probability' => new ProbabilityDraw($this->random)->draw($state),
+            'elimination' => new EliminationDraw($this->random)->draw($state),
+            'weightedElimination' => new WeightedEliminationDraw($this->random)->draw($state),
+            'roundRobin' => new RoundRobinDraw()->draw($state),
+            'cumulative' => new CumulativeDraw($this->random)->draw($state),
+            'timeBased' => new TimeBasedWeightedDraw($this->random)->draw($state),
+            'sequential' => new SequentialDraw()->draw($state),
+            'rangeWeighted' => new RangeWeightedDraw($this->random)->draw($state),
+            default => throw new ValidationException("Unsupported item draw method: {$method}"),
+        };
     }
 
+    /**
+     * @param list<array<string, mixed>> $items
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
     private function executeFlexible(string $method, array $items, array $options): array
     {
-        $count = max(1, (int) ($options['count'] ?? 1));
-        $withReplacement = (bool) ($options['withReplacement'] ?? false);
-        $check = (bool) ($options['check'] ?? true);
+        $count = max(1, $this->intValue($options['count'] ?? null, 1));
+        $withReplacement = $this->boolValue($options['withReplacement'] ?? false);
+        $check = $this->boolValue($options['check'] ?? true);
 
         $state = new FlexibleState($items);
-        $strategy = $this->strategy($method);
-
         if ($check) {
             $this->checkFlexible($state->items, $method);
         }
 
-        $entries = [];
-        $raw = [];
-
         if (in_array($method, ['batched', 'weightedBatch'], true)) {
-            $result = match ($method) {
-                'batched' => $strategy->draw($state, $count, $withReplacement),
-                'weightedBatch' => $strategy->draw($state, $count),
-                default => throw new ValidationException("Unsupported batch-capable method: {$method}"),
-            };
-            $raw = $result;
-            foreach ((array) $result as $value) {
+            $batch = $this->drawFlexibleBatch($method, $state, $count, $withReplacement);
+            $entries = [];
+            foreach ($batch as $value) {
                 $entries[] = ResultBuilder::entry(
-                    itemId: is_string($value) ? $value : null,
+                    itemId: $value,
                     candidateId: null,
                     value: $value,
                 );
             }
 
-            return ResultBuilder::response($method, $entries, $raw, $count);
+            return ResultBuilder::response($method, $entries, $batch, $count);
         }
 
+        $entries = [];
+        $raw = [];
         for ($i = 0; $i < $count; $i++) {
-            $value = $strategy->draw($state);
+            $value = $this->drawFlexibleSingle($method, $state);
             $raw[] = $value;
             $entries[] = ResultBuilder::entry(
                 itemId: is_string($value) ? $value : null,
@@ -151,129 +186,64 @@ class ItemMethodHandler implements MethodHandlerInterface
         return ResultBuilder::response($method, $entries, $raw, $count);
     }
 
-    private function executeLucky(array $items, array $options): array
-    {
-        $count = max(1, (int) ($options['count'] ?? 1));
-        $check = (bool) ($options['check'] ?? true);
-        $entries = [];
-        $raw = [];
-
-        if ($check) {
-            $this->checkLucky($items);
-        }
-
-        for ($i = 0; $i < $count; $i++) {
-            $pick = $this->pickLucky($items);
-            $raw[] = $pick;
-            $entries[] = ResultBuilder::entry(
-                itemId: (string) $pick['item'],
-                candidateId: null,
-                value: $pick['amount'],
-                meta: ['amount' => $pick['amount']],
-            );
-        }
-
-        return ResultBuilder::response('lucky', $entries, $raw, $count);
-    }
-
-    private function fractionLength(array $items): int
-    {
-        $length = 0;
-        foreach ($items as $item) {
-            DrawValidator::assertPositiveNumeric($item, 'Chances');
-            $value = (string) $item;
-            $dot = strpos($value, '.');
-            $dot !== false && $length = max($length, strlen($value) - $dot - 1);
-        }
-        return $length;
-    }
-
-    private function isSequential(array $array): bool
-    {
-        return array_keys($array) === range(0, count($array) - 1);
-    }
-
-    private function normalizeNumericKey(string $value): float|int
-    {
-        if (!is_numeric($value)) {
-            throw new ValidationException('Weighted amount keys must be numeric.');
-        }
-        return str_contains($value, '.') ? (float) $value : (int) $value;
-    }
-
-    private function pickLucky(array $items): array
-    {
-        $preparedItems = $this->prepareWeighted(array_filter(array_column($items, 'chances', 'item')));
-        if (empty($preparedItems)) {
-            throw new ValidationException('At least one item must have a positive chance.');
-        }
-
-        $pickedItem = $this->drawWeighted($preparedItems);
-        $index = array_search($pickedItem, array_column($items, 'item'), true);
-        if ($index === false) {
-            throw new ValidationException('Selected item could not be resolved.');
-        }
-
-        $amounts = $items[$index]['amounts'];
-        is_string($amounts) && $amounts = [$this->weightedAmountRange($amounts)];
-
-        return [
-            'item' => $pickedItem,
-            'amount' => $this->selectLuckyAmount((array) $amounts),
-        ];
-    }
-
-    private function prepareWeighted(array $items): array
-    {
-        $length = $this->fractionLength($items);
-        if ($length === 0) {
-            return $items;
-        }
-
-        $multiplier = 10 ** $length;
-        return array_map(fn($value) => (int) bcmul((string) $value, (string) $multiplier), $items);
-    }
-
-    private function selectLuckyAmount(array $amounts): float|int
+    private function intValue(mixed $value, int $default): int
     {
         return match (true) {
-            count($amounts) === 1 => current($amounts),
-            $this->isSequential($amounts) => $amounts[$this->random->pickArrayKey($amounts)],
-            default => $this->normalizeNumericKey($this->drawWeighted($amounts)),
+            is_int($value) => $value,
+            is_float($value) => (int) $value,
+            is_string($value) && is_numeric($value) => (int) $value,
+            default => $default,
         };
     }
 
-    private function strategy(string $method): object
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeAssocArray(mixed $value, string $field): array
     {
-        return match ($method) {
-            'probability' => new ProbabilityDraw($this->random),
-            'elimination' => new EliminationDraw($this->random),
-            'weightedElimination' => new WeightedEliminationDraw($this->random),
-            'roundRobin' => new RoundRobinDraw(),
-            'cumulative' => new CumulativeDraw($this->random),
-            'batched' => new BatchedDraw($this->random),
-            'timeBased' => new TimeBasedWeightedDraw($this->random),
-            'weightedBatch' => new WeightedBatchDraw(new ProbabilityDraw($this->random)),
-            'sequential' => new SequentialDraw(),
-            'rangeWeighted' => new RangeWeightedDraw($this->random),
-            default => throw new ValidationException("Unsupported item draw method: {$method}"),
-        };
+        if (!is_array($value)) {
+            throw new ValidationException("{$field} must be an array.");
+        }
+
+        $normalized = [];
+        foreach ($value as $key => $item) {
+            $normalized[(string) $key] = $item;
+        }
+
+        return $normalized;
     }
 
-    private function weightedAmountRange(string $amounts): float
+    /**
+     * @param array<int|string, mixed> $items
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeItems(array $items): array
     {
-        $parts = str_getcsv($amounts, ',', '"', '\\');
-        count($parts) !== 3 && throw new ValidationException('Invalid amount range (expected: min,max,bias).');
-        [$min, $max, $bias] = array_map(floatval(...), $parts);
-        $max <= $min && throw new ValidationException('Maximum value should be greater than minimum.');
-        $bias <= 0 && throw new ValidationException('Bias should be greater than 0.');
+        $normalized = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                throw new ValidationException('Each item must be an array.');
+            }
 
-        return max(
-            min(
-                round($min + $this->random->float() ** $bias * ($max - $min + 1), $this->fractionLength([$min, $max])),
-                $max,
-            ),
-            $min,
-        );
+            $row = [];
+            foreach ($item as $key => $value) {
+                $row[(string) $key] = $value;
+            }
+            $normalized[] = $row;
+        }
+
+        return $normalized;
+    }
+
+    private function numericAsFloat(mixed $value, string $field): float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (float) $value;
+        }
+
+        throw new ValidationException("{$field} must be numeric.");
     }
 }

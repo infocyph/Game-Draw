@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Exceptions\EmptyPoolException;
@@ -12,8 +14,9 @@ class SequentialDraw
             throw new EmptyPoolException('No items left to draw.');
         }
 
-        $item = $state->items[$state->rrdIndex]['name'];
+        $item = $state->itemName($state->rrdIndex);
         $state->rrdIndex = ($state->rrdIndex + 1) % count($state->items);
+
         return $item;
     }
 }

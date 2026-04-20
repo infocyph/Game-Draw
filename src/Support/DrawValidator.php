@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Support;
 
 use Infocyph\Draw\Exceptions\ValidationException;
@@ -15,11 +17,14 @@ final class DrawValidator
 
     public static function assertNonNegativeNumeric(mixed $value, string $field): void
     {
-        self::assertNumeric($value, $field);
-        if ((float) $value < 0) {
+        if (self::numericValue($value, $field) < 0) {
             throw new ValidationException("{$field} must be greater than or equal to zero.");
         }
     }
+
+    /**
+     * @param array<mixed> $values
+     */
     public static function assertNotEmpty(array $values, string $message): void
     {
         if (empty($values)) {
@@ -36,8 +41,7 @@ final class DrawValidator
 
     public static function assertPositiveNumeric(mixed $value, string $field): void
     {
-        self::assertNumeric($value, $field);
-        if ((float) $value <= 0) {
+        if (self::numericValue($value, $field) <= 0) {
             throw new ValidationException("{$field} must be greater than zero.");
         }
     }
@@ -49,6 +53,10 @@ final class DrawValidator
         }
     }
 
+    /**
+     * @param array<mixed> $items
+     * @param array<string, bool> $requiredKeys
+     */
     public static function assertRequiredKeys(array $items, array $requiredKeys, string $context): void
     {
         foreach ($items as $index => $item) {
@@ -63,5 +71,17 @@ final class DrawValidator
                 );
             }
         }
+    }
+
+    private static function numericValue(mixed $value, string $field): float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (float) $value;
+        }
+
+        throw new ValidationException("{$field} must be numeric.");
     }
 }
