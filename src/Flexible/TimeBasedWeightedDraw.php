@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
@@ -19,7 +21,9 @@ class TimeBasedWeightedDraw
         }
 
         if (empty($state->lastPickedTimestamps)) {
-            $state->lastPickedTimestamps = array_fill_keys(array_column($state->items, 'name'), 0);
+            foreach (array_keys($state->items) as $index) {
+                $state->lastPickedTimestamps[$state->itemName($index)] = 0.0;
+            }
         }
 
         $currentTime = microtime(true);
@@ -31,36 +35,37 @@ class TimeBasedWeightedDraw
             'monthly' => 30 * 24 * 60 * 60,
         ];
 
-        usort($state->items, function ($a, $b) use ($currentTime, $intervalThresholds, $state) {
-            $lastPickedA = $state->lastPickedTimestamps[$a['name']] ?? 0;
-            $lastPickedB = $state->lastPickedTimestamps[$b['name']] ?? 0;
-            $thresholdA = $intervalThresholds[$a['time']] ?? $intervalThresholds['daily'];
-            $thresholdB = $intervalThresholds[$b['time']] ?? $intervalThresholds['daily'];
-            $aIsOld = ($currentTime - $lastPickedA) >= $thresholdA;
-            $bIsOld = ($currentTime - $lastPickedB) >= $thresholdB;
+        $weightedItems = [];
+        foreach ($state->items as $index => $item) {
+            $name = $state->itemName($index);
+            $time = $state->itemTime($index);
+            $lastPicked = $state->lastPickedTimestamps[$name] ?? 0.0;
+            $threshold = $intervalThresholds[$time] ?? $intervalThresholds['daily'];
+            $elapsed = max(0.0, $currentTime - $lastPicked);
+            $urgencyBoost = max(1.0, $elapsed / $threshold);
 
-            return match (true) {
-                $aIsOld && !$bIsOld => -1,
-                !$aIsOld && $bIsOld => 1,
-                default => $b['weight'] <=> $a['weight'],
-            };
-        });
+            $weightedItems[] = [
+                'index' => $index,
+                'weight' => $state->itemWeight($index) * $urgencyBoost,
+            ];
+        }
 
-        [$weights, $totalWeight] = WeightTools::prepare($state->items);
+        [$weights, $totalWeight] = WeightTools::prepare($weightedItems);
         if ($totalWeight <= 0) {
-            throw new ValidationException("Total weight must be greater than zero.");
+            throw new ValidationException('Total weight must be greater than zero.');
         }
 
         $randomWeight = $this->random->int(1, $totalWeight);
         foreach ($weights as $weight) {
             $randomWeight -= $weight['weight'];
             if ($randomWeight <= 0) {
-                $pickedItem = $state->items[$weight['index']]['name'];
+                $pickedItem = $state->itemName($weightedItems[$weight['index']]['index']);
                 $state->lastPickedTimestamps[$pickedItem] = $currentTime;
+
                 return $pickedItem;
             }
         }
 
-        throw new DrawExhaustedException("Draw failed unexpectedly (probably due to invalid weights).");
+        throw new DrawExhaustedException('Draw failed unexpectedly (probably due to invalid weights).');
     }
 }

@@ -16,7 +16,7 @@
                 {
                     "component": "bar_chart_aggregate",
                     "x_partition": ["subject_name"],
-                    "bar_partition": ["variant_name"],
+                    "bar_partition": ["benchmark_name"],
                     "y_expr": "mode(partition['result_time_avg'])",
                     "y_axes_label": "yValue as time precision 1"
                 }

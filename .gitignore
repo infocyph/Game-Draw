@@ -3,6 +3,7 @@
 .phpunit.cache
 .vscode
 .windsurf
+.codex
 *~
 *.patch
 *.txt
@@ -16,3 +17,4 @@ patch.php
 test.php
 var
 vendor
+d2utmp*

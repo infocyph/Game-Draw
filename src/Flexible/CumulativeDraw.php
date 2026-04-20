@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
+use Infocyph\Draw\Exceptions\DrawExhaustedException;
 use Infocyph\Draw\Exceptions\EmptyPoolException;
 
 class CumulativeDraw
@@ -16,7 +19,9 @@ class CumulativeDraw
         }
 
         if (empty($state->cumulativeScores)) {
-            $state->cumulativeScores = array_fill_keys(array_column($state->items, 'name'), 0);
+            foreach (array_keys($state->items) as $index) {
+                $state->cumulativeScores[$state->itemName($index)] = 0;
+            }
         }
 
         foreach ($state->cumulativeScores as $item => &$score) {
@@ -26,7 +31,11 @@ class CumulativeDraw
         }
         unset($score);
 
-        $pickedItem = array_search(max($state->cumulativeScores), $state->cumulativeScores, true);
+        $bestScore = max($state->cumulativeScores);
+        $pickedItem = array_search($bestScore, $state->cumulativeScores, true);
+        if (!is_string($pickedItem)) {
+            throw new DrawExhaustedException('Unable to resolve cumulative pick.');
+        }
         $state->cumulativeScores[$pickedItem] = 0;
         $state->lastPickedItem = $pickedItem;
 

@@ -27,6 +27,7 @@ final class DrawBench
         $draw = new Draw(new SeededRandomGenerator(102));
         $draw->execute($params['request']);
     }
+
     #[Bench\Revs(100)]
     #[Bench\ParamProviders('provideItemRequests')]
     public function benchItemMethods(array $params): void

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
@@ -13,9 +15,14 @@ class WeightedEliminationDraw
 
     public function draw(FlexibleState $state): string
     {
-        [$weights, $totalWeight] = WeightTools::prepare($state->items);
+        $weightsInput = [];
+        foreach (array_keys($state->items) as $index) {
+            $weightsInput[] = ['weight' => $state->itemWeight($index)];
+        }
+
+        [$weights, $totalWeight] = WeightTools::prepare($weightsInput);
         if ($totalWeight <= 0) {
-            throw new ValidationException("Total weight must be greater than zero.");
+            throw new ValidationException('Total weight must be greater than zero.');
         }
 
         $randomWeight = $this->random->int(1, $totalWeight);
@@ -23,13 +30,13 @@ class WeightedEliminationDraw
             $randomWeight -= $weight['weight'];
             if ($randomWeight <= 0) {
                 $index = $weight['index'];
-                $pickedItem = $state->items[$index]['name'];
-                unset($state->items[$index]);
-                $state->items = array_values($state->items);
+                $pickedItem = $state->itemName($index);
+                $state->removeItem($index);
+
                 return $pickedItem;
             }
         }
 
-        throw new DrawExhaustedException("Draw failed unexpectedly.");
+        throw new DrawExhaustedException('Draw failed unexpectedly.');
     }
 }

@@ -143,7 +143,9 @@ test('covers grand draw with sourceFile input', function () {
         ->and($result['entries'])->toHaveCount(3)
         ->and($result['entries'][0])->toHaveKeys(['itemId', 'candidateId', 'value', 'meta']);
 
-    @unlink($tmpFile);
+    if (is_file($tmpFile)) {
+        unlink($tmpFile);
+    }
 });
 
 test('covers campaign.run, campaign.batch and campaign.simulate', function () {
