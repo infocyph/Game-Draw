@@ -98,14 +98,9 @@ class MemoryCachePool implements CacheItemPoolInterface
         $key = $item->getKey();
         $this->assertValidKey($key);
 
-        $expiresAt = null;
-        if ($item instanceof MemoryCacheItem) {
-            $expiresAt = $item->expiration();
-        }
-
         $this->store[$key] = [
             'value' => $item->get(),
-            'expiresAt' => $expiresAt,
+            'expiresAt' => $this->itemExpiration($item),
         ];
         unset($this->deferred[$key]);
 
@@ -117,12 +112,12 @@ class MemoryCachePool implements CacheItemPoolInterface
         $key = $item->getKey();
         $this->assertValidKey($key);
 
-        $expiresAt = null;
-        if ($item instanceof MemoryCacheItem) {
-            $expiresAt = $item->expiration();
-        }
-
-        $this->deferred[$key] = new MemoryCacheItem($key, $item->get(), $item->isHit(), $expiresAt);
+        $this->deferred[$key] = new MemoryCacheItem(
+            $key,
+            $item->get(),
+            $item->isHit(),
+            $this->itemExpiration($item),
+        );
 
         return true;
     }
@@ -145,5 +140,10 @@ class MemoryCachePool implements CacheItemPoolInterface
         }
 
         return $expiresAt <= new DateTimeImmutable();
+    }
+
+    private function itemExpiration(CacheItemInterface $item): ?DateTimeImmutable
+    {
+        return $item instanceof MemoryCacheItem ? $item->expiration() : null;
     }
 }

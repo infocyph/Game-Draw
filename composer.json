@@ -5,12 +5,16 @@
     "type": "library",
     "authors": [
         {
+            "name": "infocyph",
+            "email": "infocyph@gmail.com"
+        },
+        {
             "name": "abmmhasan",
             "email": "abmmhasan@gmail.com"
         }
     ],
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.2",
         "ext-bcmath": "*",
         "psr/cache": "^3.0"
     },

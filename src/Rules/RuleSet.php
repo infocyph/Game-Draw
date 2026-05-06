@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Infocyph\Draw\Rules;
 
 use Infocyph\Draw\Exceptions\ValidationException;
+use Infocyph\Draw\Support\ScalarValue;
 
 class RuleSet
 {
@@ -44,8 +45,8 @@ class RuleSet
      */
     public static function fromArray(array $rules): self
     {
-        $perUserCap = self::toIntOrDefault($rules['perUserCap'] ?? null, 1);
-        $cooldownSeconds = self::toIntOrDefault($rules['cooldownSeconds'] ?? null, 0);
+        $perUserCap = ScalarValue::toInt($rules['perUserCap'] ?? null, 1);
+        $cooldownSeconds = ScalarValue::toInt($rules['cooldownSeconds'] ?? null, 0);
         $perItemCap = self::toIntMap($rules['perItemCap'] ?? []);
         $groupQuota = self::toIntMap($rules['groupQuota'] ?? []);
 
@@ -82,19 +83,9 @@ class RuleSet
         $result = [];
         foreach ($value as $key => $item) {
             $keyAsString = is_string($key) ? $key : (string) $key;
-            $result[$keyAsString] = self::toIntOrDefault($item, 0);
+            $result[$keyAsString] = ScalarValue::toInt($item, 0);
         }
 
         return $result;
-    }
-
-    private static function toIntOrDefault(mixed $value, int $default): int
-    {
-        return match (true) {
-            is_int($value) => $value,
-            is_float($value) => (int) $value,
-            is_string($value) && is_numeric($value) => (int) $value,
-            default => $default,
-        };
     }
 }

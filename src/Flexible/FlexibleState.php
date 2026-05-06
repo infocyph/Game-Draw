@@ -66,34 +66,43 @@ class FlexibleState
         }
     }
 
+    public function ensureCumulativeScoresInitialized(): void
+    {
+        if ($this->cumulativeScores !== []) {
+            return;
+        }
+
+        foreach (array_keys($this->items) as $index) {
+            $this->cumulativeScores[$this->itemName($index)] = 0;
+        }
+    }
+
+    public function ensureHasItems(string $message): void
+    {
+        if ($this->items === []) {
+            throw new ValidationException($message);
+        }
+    }
+
+    public function ensureLastPickedTimestampsInitialized(): void
+    {
+        if ($this->lastPickedTimestamps !== []) {
+            return;
+        }
+
+        foreach (array_keys($this->items) as $index) {
+            $this->lastPickedTimestamps[$this->itemName($index)] = 0.0;
+        }
+    }
+
     public function itemName(int|string $index): string
     {
-        $item = $this->items[$index] ?? null;
-        if (!is_array($item)) {
-            throw new ValidationException("Item at index {$index} is invalid.");
-        }
-
-        $name = $item['name'] ?? null;
-        if (!is_string($name) || $name === '') {
-            throw new ValidationException("Item at index {$index} must have a non-empty 'name'.");
-        }
-
-        return $name;
+        return $this->requiredStringField($index, 'name');
     }
 
     public function itemTime(int|string $index): string
     {
-        $item = $this->items[$index] ?? null;
-        if (!is_array($item)) {
-            throw new ValidationException("Item at index {$index} is invalid.");
-        }
-
-        $time = $item['time'] ?? null;
-        if (!is_string($time) || $time === '') {
-            throw new ValidationException("Item at index {$index} must have a non-empty 'time'.");
-        }
-
-        return $time;
+        return $this->requiredStringField($index, 'time');
     }
 
     public function itemWeight(int|string $index): float
@@ -122,5 +131,20 @@ class FlexibleState
         }
 
         array_splice($this->items, $offset, 1);
+    }
+
+    private function requiredStringField(int|string $index, string $field): string
+    {
+        $item = $this->items[$index] ?? null;
+        if (!is_array($item)) {
+            throw new ValidationException("Item at index {$index} is invalid.");
+        }
+
+        $value = $item[$field] ?? null;
+        if (!is_string($value) || $value === '') {
+            throw new ValidationException("Item at index {$index} must have a non-empty '{$field}'.");
+        }
+
+        return $value;
     }
 }

@@ -14,11 +14,14 @@ use Infocyph\Draw\Support\DrawValidator;
 use Infocyph\Draw\Unified\Contracts\MethodHandlerInterface;
 use Infocyph\Draw\Unified\Handlers\Support\CampaignBatchFormatter;
 use Infocyph\Draw\Unified\Handlers\Support\CampaignEngine;
+use Infocyph\Draw\Unified\Handlers\Support\NormalizesHandlerInput;
 use Infocyph\Draw\Unified\Support\ResultBuilder;
 use Psr\Cache\CacheItemPoolInterface;
 
 class CampaignMethodHandler implements MethodHandlerInterface
 {
+    use NormalizesHandlerInput;
+
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     /**
@@ -27,39 +30,21 @@ class CampaignMethodHandler implements MethodHandlerInterface
      */
     public function execute(array $request): array
     {
-        $method = $this->requiredString($request['method'] ?? null, 'method');
-        $items = $request['items'] ?? null;
-        $candidatesRaw = $request['candidates'] ?? null;
-        $optionsRaw = $request['options'] ?? [];
-
-        if (!is_array($candidatesRaw) || $candidatesRaw === []) {
-            throw new ValidationException('candidates is required and must be a non-empty array for campaign methods.');
-        }
-        if (!is_array($optionsRaw)) {
-            throw new ValidationException('options must be an array when provided.');
-        }
-
-        $options = $this->normalizeAssocArray($optionsRaw, 'options');
-        $users = $this->normalizeUsers($candidatesRaw);
-        if ($method === 'campaign.batch') {
-            $normalizedItems = [];
-        } else {
-            if (!is_array($items) || $items === []) {
-                throw new ValidationException('items is required and must be a non-empty array.');
-            }
-            $normalizedItems = $this->normalizeItems($items);
-        }
-
-        $rules = RuleSet::fromArray($this->normalizeAssocArray($options['rules'] ?? [], 'options.rules'));
-        $auditSecret = $this->optionalString($options['auditSecret'] ?? null) ?? '';
-        $eligibility = $this->resolveEligibility($options);
-        $cachePool = $this->resolveCachePool($options);
-        $random = $this->resolveRandom($options);
+        $context = $this->prepareExecutionContext($request);
+        $method = $context['method'];
+        $options = $context['options'];
+        $users = $context['users'];
+        $items = $context['items'];
+        $rules = $context['rules'];
+        $auditSecret = $context['auditSecret'];
+        $eligibility = $context['eligibility'];
+        $cachePool = $context['cachePool'];
+        $random = $context['random'];
 
         return match ($method) {
             'campaign.run' => $this->runCampaign(
                 users: $users,
-                items: $normalizedItems,
+                items: $items,
                 rules: $rules,
                 auditSecret: $auditSecret,
                 options: $options,
@@ -78,7 +63,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
             ),
             'campaign.simulate' => $this->simulate(
                 users: $users,
-                items: $normalizedItems,
+                items: $items,
                 rules: $rules,
                 options: $options,
                 eligibility: $eligibility,
@@ -92,16 +77,6 @@ class CampaignMethodHandler implements MethodHandlerInterface
         return ['campaign.run', 'campaign.batch', 'campaign.simulate'];
     }
 
-    private function boolValue(mixed $value): bool
-    {
-        return match (true) {
-            is_bool($value) => $value,
-            is_int($value) => $value !== 0,
-            is_string($value) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
-            default => (bool) $value,
-        };
-    }
-
     private function firstDefinedString(mixed $first, mixed $second): string
     {
         $primary = $this->optionalString($first);
@@ -110,43 +85,6 @@ class CampaignMethodHandler implements MethodHandlerInterface
         }
 
         return $this->optionalString($second) ?? '';
-    }
-
-    private function floatValue(mixed $value, float $default): float
-    {
-        return match (true) {
-            is_int($value) => (float) $value,
-            is_float($value) => $value,
-            is_string($value) && is_numeric($value) => (float) $value,
-            default => $default,
-        };
-    }
-
-    private function intValue(mixed $value, int $default): int
-    {
-        return match (true) {
-            is_int($value) => $value,
-            is_float($value) => (int) $value,
-            is_string($value) && is_numeric($value) => (int) $value,
-            default => $default,
-        };
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeAssocArray(mixed $value, string $field): array
-    {
-        if (!is_array($value)) {
-            throw new ValidationException("{$field} must be an array.");
-        }
-
-        $normalized = [];
-        foreach ($value as $key => $item) {
-            $normalized[(string) $key] = $item;
-        }
-
-        return $normalized;
     }
 
     /**
@@ -213,24 +151,46 @@ class CampaignMethodHandler implements MethodHandlerInterface
         return $normalized;
     }
 
-    private function optionalString(mixed $value): ?string
+    /**
+     * @param array<string, mixed> $request
+     * @return array{
+     *   method: string,
+     *   options: array<string, mixed>,
+     *   users: list<string>,
+     *   items: array<string, array{count: int, weight: float, group: ?string}>,
+     *   rules: RuleSet,
+     *   auditSecret: string,
+     *   eligibility: ?callable,
+     *   cachePool: CacheItemPoolInterface,
+     *   random: RandomGeneratorInterface
+     * }
+     */
+    private function prepareExecutionContext(array $request): array
     {
-        if (!is_string($value)) {
-            return null;
-        }
+        $method = $this->requiredString($request['method'] ?? null, 'method');
+        $options = $this->normalizeAssocArray($request['options'] ?? [], 'options');
+        $users = $this->normalizeUsers($this->requireNonEmptyArray(
+            $request['candidates'] ?? null,
+            'candidates is required and must be a non-empty array for campaign methods.',
+        ));
+        $items = $method === 'campaign.batch'
+            ? []
+            : $this->normalizeItems($this->requireNonEmptyArray(
+                $request['items'] ?? null,
+                'items is required and must be a non-empty array.',
+            ));
 
-        $trimmed = trim($value);
-
-        return $trimmed === '' ? null : $trimmed;
-    }
-
-    private function requiredString(mixed $value, string $field): string
-    {
-        if (!is_string($value) || trim($value) === '') {
-            throw new ValidationException("{$field} is required and must be a non-empty string.");
-        }
-
-        return trim($value);
+        return [
+            'method' => $method,
+            'options' => $options,
+            'users' => $users,
+            'items' => $items,
+            'rules' => RuleSet::fromArray($this->normalizeAssocArray($options['rules'] ?? [], 'options.rules')),
+            'auditSecret' => $this->optionalString($options['auditSecret'] ?? null) ?? '',
+            'eligibility' => $this->resolveEligibility($options),
+            'cachePool' => $this->resolveCachePool($options),
+            'random' => $this->resolveRandom($options),
+        ];
     }
 
     /**

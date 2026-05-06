@@ -14,15 +14,10 @@ class CumulativeDraw
 
     public function draw(FlexibleState $state): string
     {
-        if (empty($state->items)) {
+        if ($state->items === []) {
             throw new EmptyPoolException('No items left to draw.');
         }
-
-        if (empty($state->cumulativeScores)) {
-            foreach (array_keys($state->items) as $index) {
-                $state->cumulativeScores[$state->itemName($index)] = 0;
-            }
-        }
+        $state->ensureCumulativeScoresInitialized();
 
         foreach ($state->cumulativeScores as $item => &$score) {
             if ($item !== $state->lastPickedItem) {
@@ -30,6 +25,10 @@ class CumulativeDraw
             }
         }
         unset($score);
+
+        if ($state->cumulativeScores === []) {
+            throw new DrawExhaustedException('Unable to resolve cumulative pick.');
+        }
 
         $bestScore = max($state->cumulativeScores);
         $pickedItem = array_search($bestScore, $state->cumulativeScores, true);
