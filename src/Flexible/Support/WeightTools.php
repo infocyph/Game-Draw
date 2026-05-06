@@ -8,7 +8,7 @@ use Infocyph\Draw\Exceptions\ValidationException;
 
 final class WeightTools
 {
-    private const int MAX_SCALE = 12;
+    private const MAX_SCALE = 12;
 
     /**
      * @param array<int, array{weight: int|float|string}> $items

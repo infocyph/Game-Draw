@@ -100,8 +100,8 @@ class ItemMethodHandler implements MethodHandlerInterface
         bool $withReplacement,
     ): array {
         return match ($method) {
-            'batched' => new BatchedDraw($this->random)->draw($state, $count, $withReplacement),
-            'weightedBatch' => new WeightedBatchDraw(new ProbabilityDraw($this->random))->draw($state, $count),
+            'batched' => (new BatchedDraw($this->random))->draw($state, $count, $withReplacement),
+            'weightedBatch' => (new WeightedBatchDraw(new ProbabilityDraw($this->random)))->draw($state, $count),
             default => throw new ValidationException("Unsupported batch-capable method: {$method}"),
         };
     }
@@ -109,14 +109,14 @@ class ItemMethodHandler implements MethodHandlerInterface
     private function drawFlexibleSingle(string $method, FlexibleState $state): string|float|int
     {
         return match ($method) {
-            'probability' => new ProbabilityDraw($this->random)->draw($state),
-            'elimination' => new EliminationDraw($this->random)->draw($state),
-            'weightedElimination' => new WeightedEliminationDraw($this->random)->draw($state),
-            'roundRobin' => new RoundRobinDraw()->draw($state),
-            'cumulative' => new CumulativeDraw($this->random)->draw($state),
-            'timeBased' => new TimeBasedWeightedDraw($this->random)->draw($state),
-            'sequential' => new SequentialDraw()->draw($state),
-            'rangeWeighted' => new RangeWeightedDraw($this->random)->draw($state),
+            'probability' => (new ProbabilityDraw($this->random))->draw($state),
+            'elimination' => (new EliminationDraw($this->random))->draw($state),
+            'weightedElimination' => (new WeightedEliminationDraw($this->random))->draw($state),
+            'roundRobin' => (new RoundRobinDraw())->draw($state),
+            'cumulative' => (new CumulativeDraw($this->random))->draw($state),
+            'timeBased' => (new TimeBasedWeightedDraw($this->random))->draw($state),
+            'sequential' => (new SequentialDraw())->draw($state),
+            'rangeWeighted' => (new RangeWeightedDraw($this->random))->draw($state),
             default => throw new ValidationException("Unsupported item draw method: {$method}"),
         };
     }

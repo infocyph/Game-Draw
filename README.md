@@ -1,4 +1,4 @@
-# Game Draw (v4)
+# Game Draw
 
 [![Security & Standards](https://github.com/infocyph/Game-Draw/actions/workflows/build.yml/badge.svg)](https://github.com/infocyph/Game-Draw/actions/workflows/build.yml)
 [![Documentation](https://img.shields.io/badge/Documentation-GameDraw-blue?logo=readthedocs&logoColor=white)](https://docs.infocyph.com/projects/Game-Draw/)
@@ -16,7 +16,7 @@ Campaign state uses PSR-6 (`Psr\Cache\CacheItemPoolInterface`) via `options.cach
 
 Requirements:
 
-- PHP 8.4+
+- PHP 8.2+
 - `ext-bcmath`
 
 ```bash
