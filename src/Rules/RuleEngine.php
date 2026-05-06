@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Infocyph\Draw\Rules;
 
+use Infocyph\Draw\Support\ScalarValue;
 use Psr\Cache\CacheItemPoolInterface;
 
 class RuleEngine
@@ -86,24 +87,12 @@ class RuleEngine
             return 0;
         }
 
-        $value = $item->get();
-
-        return match (true) {
-            is_int($value) => $value,
-            is_float($value) => (int) $value,
-            is_string($value) && is_numeric($value) => (int) $value,
-            default => 0,
-        };
+        return ScalarValue::toInt($item->get(), 0);
     }
 
     private function readRawInt(mixed $value): int
     {
-        return match (true) {
-            is_int($value) => $value,
-            is_float($value) => (int) $value,
-            is_string($value) && is_numeric($value) => (int) $value,
-            default => 0,
-        };
+        return ScalarValue::toInt($value, 0);
     }
 
     private function setKeyValue(string $key, mixed $value): void

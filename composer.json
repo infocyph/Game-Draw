@@ -5,6 +5,10 @@
     "type": "library",
     "authors": [
         {
+            "name": "infocyph",
+            "email": "infocyph@gmail.com"
+        },
+        {
             "name": "abmmhasan",
             "email": "abmmhasan@gmail.com"
         }

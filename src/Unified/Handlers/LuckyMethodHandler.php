@@ -9,10 +9,13 @@ use Infocyph\Draw\Exceptions\ValidationException;
 use Infocyph\Draw\Flexible\Support\WeightTools;
 use Infocyph\Draw\Support\DrawValidator;
 use Infocyph\Draw\Unified\Contracts\MethodHandlerInterface;
+use Infocyph\Draw\Unified\Handlers\Support\NormalizesHandlerInput;
 use Infocyph\Draw\Unified\Support\ResultBuilder;
 
 class LuckyMethodHandler implements MethodHandlerInterface
 {
+    use NormalizesHandlerInput;
+
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     /**
@@ -21,20 +24,14 @@ class LuckyMethodHandler implements MethodHandlerInterface
      */
     public function execute(array $request): array
     {
-        $items = $request['items'] ?? null;
-        $optionsRaw = $request['options'] ?? [];
-
-        if (!is_array($items) || $items === []) {
-            throw new ValidationException('items is required and must be a non-empty array.');
-        }
-        if (!is_array($optionsRaw)) {
-            throw new ValidationException('options must be an array when provided.');
-        }
-
-        $options = $this->normalizeAssocArray($optionsRaw, 'options');
+        $items = $this->requireNonEmptyArray(
+            $request['items'] ?? null,
+            'items is required and must be a non-empty array.',
+        );
+        $options = $this->normalizeAssocArray($request['options'] ?? [], 'options');
         $count = max(1, $this->intValue($options['count'] ?? null, 1));
         $check = $this->boolValue($options['check'] ?? true);
-        $normalizedItems = $this->normalizeLuckyItems($this->normalizeItems($items), $check);
+        $normalizedItems = $this->normalizeLuckyItems($this->normalizeRows($items), $check);
 
         $entries = [];
         $raw = [];
@@ -111,16 +108,6 @@ class LuckyMethodHandler implements MethodHandlerInterface
         return $map;
     }
 
-    private function boolValue(mixed $value): bool
-    {
-        return match (true) {
-            is_bool($value) => $value,
-            is_int($value) => $value !== 0,
-            is_string($value) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
-            default => (bool) $value,
-        };
-    }
-
     /**
      * @param array<string, int> $items
      */
@@ -147,16 +134,6 @@ class LuckyMethodHandler implements MethodHandlerInterface
         }
 
         return array_key_last($items);
-    }
-
-    private function intValue(mixed $value, int $default): int
-    {
-        return match (true) {
-            is_int($value) => $value,
-            is_float($value) => (int) $value,
-            is_string($value) && is_numeric($value) => (int) $value,
-            default => $default,
-        };
     }
 
     /**
@@ -192,45 +169,6 @@ class LuckyMethodHandler implements MethodHandlerInterface
         $normalized = [];
         foreach ($amounts as $amount => $weight) {
             $normalized[(string) $amount] = $this->normalizeNumericValue($weight, 'weighted amount');
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeAssocArray(mixed $value, string $field): array
-    {
-        if (!is_array($value)) {
-            throw new ValidationException("{$field} must be an array.");
-        }
-
-        $normalized = [];
-        foreach ($value as $key => $item) {
-            $normalized[(string) $key] = $item;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param array<int|string, mixed> $items
-     * @return list<array<string, mixed>>
-     */
-    private function normalizeItems(array $items): array
-    {
-        $normalized = [];
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                throw new ValidationException('Each item must be an array.');
-            }
-
-            $row = [];
-            foreach ($item as $key => $value) {
-                $row[(string) $key] = $value;
-            }
-            $normalized[] = $row;
         }
 
         return $normalized;
@@ -303,18 +241,6 @@ class LuckyMethodHandler implements MethodHandlerInterface
         return str_contains($value, '.') || stripos($value, 'e') !== false
             ? (float) $value
             : (int) $value;
-    }
-
-    private function numericAsFloat(mixed $value, string $field): float
-    {
-        if (is_int($value) || is_float($value)) {
-            return (float) $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (float) $value;
-        }
-
-        throw new ValidationException("{$field} must be numeric.");
     }
 
     /**
@@ -406,15 +332,6 @@ class LuckyMethodHandler implements MethodHandlerInterface
         }
 
         return $result;
-    }
-
-    private function requiredString(mixed $value, string $field): string
-    {
-        if (!is_string($value) || trim($value) === '') {
-            throw new ValidationException("{$field} must be a non-empty string.");
-        }
-
-        return trim($value);
     }
 
     /**

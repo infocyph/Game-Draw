@@ -7,11 +7,14 @@ namespace Infocyph\Draw\Unified\Handlers;
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
 use Infocyph\Draw\Exceptions\ValidationException;
 use Infocyph\Draw\Unified\Contracts\MethodHandlerInterface;
+use Infocyph\Draw\Unified\Handlers\Support\NormalizesHandlerInput;
 use Infocyph\Draw\Unified\Support\ResultBuilder;
 use SplFileObject;
 
 class UserMethodHandler implements MethodHandlerInterface
 {
+    use NormalizesHandlerInput;
+
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     /**
@@ -105,16 +108,6 @@ class UserMethodHandler implements MethodHandlerInterface
         }
 
         return $winners;
-    }
-
-    private function intValue(mixed $value, int $default): int
-    {
-        return match (true) {
-            is_int($value) => $value,
-            is_float($value) => (int) $value,
-            is_string($value) && is_numeric($value) => (int) $value,
-            default => $default,
-        };
     }
 
     /**

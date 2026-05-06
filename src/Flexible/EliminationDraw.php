@@ -17,10 +17,6 @@ class EliminationDraw
             throw new EmptyPoolException('No items left to draw.');
         }
 
-        $index = $this->random->pickArrayKey($state->items);
-        $pickedItem = $state->itemName($index);
-        $state->removeItem($index);
-
-        return $pickedItem;
+        return new BatchedDraw($this->random)->draw($state, 1, false)[0];
     }
 }
