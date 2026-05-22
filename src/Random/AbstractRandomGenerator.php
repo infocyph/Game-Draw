@@ -38,11 +38,7 @@ abstract class AbstractRandomGenerator implements RandomGeneratorInterface
         }
 
         $keys = $this->randomizer->pickArrayKeys($items, 1);
-        $pickedKey = reset($keys);
-        if (!is_int($pickedKey) && !is_string($pickedKey)) {
-            throw new ValidationException('Random array key must be an integer or string.');
-        }
 
-        return $pickedKey;
+        return $keys[0];
     }
 }
