@@ -49,6 +49,18 @@ $result = $draw->execute([
 - `batched`, `timeBased`, `weightedBatch`, `sequential`, `rangeWeighted`
 - `campaign.run`, `campaign.batch`, `campaign.simulate`
 
-## Documentation
+## Security
 
-Published docs: https://docs.infocyph.com/projects/Game-Draw/
+Protected by [PHPForge](https://github.com/infocyph/PHPForge) — an automated quality and security gate for PHP projects.
+
+---
+
+<div align="center">
+  <sub><strong>Made with ❤️ for the PHP community</strong></sub><br />
+  <sub><a href="LICENSE">MIT Licensed</a></sub><br />
+  <a href="https://docs.infocyph.com/projects/Game-Draw">Documentation</a> •
+  <a href="SECURITY.md">Security</a> •
+  <a href="CODE_OF_CONDUCT.md">Code of Conduct</a> •
+  <a href="CONTRIBUTING.md">Contributing</a> •
+  <a href="https://github.com/infocyph/Game-Draw/issues">Report | Request | Suggest</a>
+</div>

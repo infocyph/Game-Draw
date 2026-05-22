@@ -2,35 +2,48 @@
 
 ## Supported Versions
 
-Security updates are provided for the latest released version of `infocyph/game-draw`.
-
-| Version | Supported |
-| ------- | --------- |
-| 4.x     | Yes       |
-| < 4.0   | No        |
+The project currently supports security updates for the latest release.
 
 ## Reporting a Vulnerability
 
-Please do not report security vulnerabilities through public GitHub issues.
+Please report vulnerabilities privately.
 
-To report a vulnerability, email `infocyph@gmail.com` with:
+1. Use GitHub private vulnerability reporting for this repository (`Security` -> `Advisories` -> `Report a vulnerability`).
+2. If private reporting is unavailable, contact maintainers through a private channel.
+3. Do not open a public issue for security vulnerabilities.
 
-- A clear description of the issue.
-- Steps to reproduce the behavior.
-- The affected version or commit, if known.
-- Any proof-of-concept code, logs, or relevant context.
-- Your preferred contact information for follow-up.
+Please include:
 
-You should receive an initial response within 72 hours. If the issue is confirmed,
-we will coordinate a fix and release timeline before public disclosure.
+- Affected package version(s)
+- PHP version and runtime environment
+- Reproduction steps or proof of concept
+- Impact assessment (confidentiality/integrity/availability)
+- Any known workaround
 
-## Disclosure
+## Response Process
 
-Please allow a reasonable amount of time for investigation, patching, and release
-before disclosing the vulnerability publicly.
+- Initial acknowledgment: best effort, typically within a few days
+- Triage: best effort, based on maintainer availability
+- Fix and release timeline depends on severity and exploitability
 
-## Dependency Security
+If a report is accepted, a patched release will be prepared and published. Credit will be provided unless you request otherwise.
 
-This project uses Composer dependencies. If you believe a vulnerability comes from
-an upstream dependency, please include the affected package and version in your
-report when possible.
+## Protected by PHPForge
+
+This project is protected by [PHPForge](https://github.com/infocyph/PHPForge), an automated quality and security tooling layer for Infocyph PHP projects.
+
+PHPForge helps keep the project reliable by running checks for:
+
+- Code style and standards
+- Tests and syntax validation
+- Static analysis and type safety
+- Security and taint analysis
+- Dependency vulnerability audit
+- Architecture boundary validation
+- Duplicate-code detection
+- API snapshot and comment-policy checks
+- Refactor safety checks
+- Benchmark and release-readiness checks
+- Git hooks and CI workflow protection
+
+These automated gates strengthen code quality, reduce security risk and help prevent regressions before merge or release.
