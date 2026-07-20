@@ -13,14 +13,12 @@ class ProbabilityDraw
 
     public function draw(FlexibleState $state): string
     {
-        $weightsInput = [];
-        foreach (array_keys($state->items) as $index) {
-            $weightsInput[] = ['weight' => $state->itemWeight($index)];
-        }
+        [$weights, $totalWeight] = $state->preparedItemWeights();
 
-        $pickedIndex = WeightedSelector::pickIndex(
+        $pickedIndex = WeightedSelector::pickPrepared(
             random: $this->random,
-            weightsInput: $weightsInput,
+            weights: $weights,
+            totalWeight: $totalWeight,
             exhaustedMessage: 'Probability draw failed unexpectedly.',
         );
 

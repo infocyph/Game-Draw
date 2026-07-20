@@ -10,7 +10,7 @@ class RoundRobinDraw
 {
     public function draw(FlexibleState $state): string
     {
-        if (empty($state->items)) {
+        if ($state->items === []) {
             throw new EmptyPoolException('No items left to draw.');
         }
 

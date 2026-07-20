@@ -6,6 +6,7 @@ namespace Infocyph\Draw\Unified\Handlers;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
 use Infocyph\Draw\Exceptions\ValidationException;
+use Infocyph\Draw\Support\DrawValidator;
 use Infocyph\Draw\Unified\Contracts\MethodHandlerInterface;
 use Infocyph\Draw\Unified\Handlers\Support\NormalizesHandlerInput;
 use Infocyph\Draw\Unified\Support\ResultBuilder;
@@ -14,6 +15,12 @@ use SplFileObject;
 class UserMethodHandler implements MethodHandlerInterface
 {
     use NormalizesHandlerInput;
+
+    private const MAX_CANDIDATES = 1_000_000;
+
+    private const MAX_ITEMS = 10_000;
+
+    private const MAX_TOTAL_WINNERS = 100_000;
 
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
@@ -33,34 +40,29 @@ class UserMethodHandler implements MethodHandlerInterface
 
         $items = $request['items'] ?? null;
         $options = $request['options'] ?? [];
-        if (!is_array($items) || empty($items)) {
+        if (!is_array($items) || $items === []) {
             throw new ValidationException('items is required and must be a non-empty array.');
         }
         if (!is_array($options)) {
             throw new ValidationException('options must be an array when provided.');
         }
+        DrawValidator::assertCountAtMost($items, self::MAX_ITEMS, 'items');
 
-        $retryCount = max(1, $this->intValue($options['retryCount'] ?? null, 10));
+        $retryCount = $this->intValue($options['retryCount'] ?? null, 10, 'options.retryCount');
+        DrawValidator::assertPositiveIntWithin($retryCount, self::MAX_TOTAL_WINNERS, 'options.retryCount');
         $normalizedItems = $this->normalizeItems($items);
-        $source = $this->resolveSource($request);
-        $requestedCount = array_sum($normalizedItems);
-        $users = $this->loadUsers($source['path']);
+        $requestedCount = $this->totalWinnerCount($normalizedItems);
+        $users = $this->resolveUsers($request);
 
-        try {
-            $raw = $this->drawWinners($normalizedItems, $users);
-            $entries = [];
-            foreach ($raw as $item => $winners) {
-                foreach ($winners as $user) {
-                    $entries[] = ResultBuilder::entry(
-                        itemId: (string) $item,
-                        candidateId: (string) $user,
-                        value: $user,
-                    );
-                }
-            }
-        } finally {
-            if ($source['temporary'] && is_file($source['path'])) {
-                unlink($source['path']);
+        $raw = $this->drawWinners($normalizedItems, $users);
+        $entries = [];
+        foreach ($raw as $item => $winners) {
+            foreach ($winners as $user) {
+                $entries[] = ResultBuilder::entry(
+                    itemId: (string) $item,
+                    candidateId: (string) $user,
+                    value: $user,
+                );
             }
         }
 
@@ -111,7 +113,7 @@ class UserMethodHandler implements MethodHandlerInterface
     }
 
     /**
-     * @return array<int, string>
+     * @return list<string>
      */
     private function loadUsers(string $sourceFile): array
     {
@@ -124,23 +126,34 @@ class UserMethodHandler implements MethodHandlerInterface
         $file->setFlags(SplFileObject::READ_CSV);
 
         $users = [];
+        $seen = [];
+        $rowCount = 0;
         while (!$file->eof()) {
             $row = $file->fgetcsv(',', '"', '\\');
+            if (!is_array($row)) {
+                continue;
+            }
+            $rowCount++;
+            if ($rowCount > self::MAX_CANDIDATES) {
+                throw new ValidationException('User source exceeds the 1000000 candidate limit.');
+            }
+
             $id = trim((string) ($row[0] ?? ''));
-            $id !== '' && $users[] = $id;
+            if ($id === '' || isset($seen[$id])) {
+                continue;
+            }
+
+            $seen[$id] = true;
+            $users[] = $id;
         }
 
-        $users = array_values(array_unique($users));
-        if (empty($users)) {
+        if ($users === []) {
             throw new ValidationException('User source is empty.');
         }
 
         return $users;
     }
 
-    /**
-     * @return array<string, int>
-     */
     /**
      * @param array<int|string, mixed> $items
      * @return array<string, int>
@@ -164,36 +177,38 @@ class UserMethodHandler implements MethodHandlerInterface
     }
 
     /**
-     * @return array{path: string, temporary: bool}
-     */
-    /**
      * @param array<string, mixed> $request
-     * @return array{path: string, temporary: bool}
+     * @return list<string>
      */
-    private function resolveSource(array $request): array
+    private function resolveUsers(array $request): array
     {
         $sourceFileRaw = $request['sourceFile'] ?? null;
         $sourceFile = is_string($sourceFileRaw) ? trim($sourceFileRaw) : '';
         if ($sourceFile !== '') {
-            return ['path' => $sourceFile, 'temporary' => false];
+            return $this->loadUsers($sourceFile);
         }
 
         $candidates = $request['candidates'] ?? null;
-        if (!is_array($candidates) || empty($candidates)) {
+        if (!is_array($candidates) || $candidates === []) {
             throw new ValidationException('Provide sourceFile or non-empty candidates for grand method.');
         }
 
-        $users = array_values(array_filter(
-            array_map(fn($value) => is_string($value) ? trim($value) : '', $candidates),
-            fn($value) => $value !== '',
-        ));
-        if (empty($users)) {
-            throw new ValidationException('candidates must contain at least one non-empty user id.');
+        return $this->normalizeCandidateIds($candidates, self::MAX_CANDIDATES);
+    }
+
+    /**
+     * @param array<string, int> $items
+     */
+    private function totalWinnerCount(array $items): int
+    {
+        $total = 0;
+        foreach ($items as $count) {
+            if ($count > self::MAX_TOTAL_WINNERS - $total) {
+                throw new ValidationException('The total requested winner count exceeds 100000.');
+            }
+            $total += $count;
         }
 
-        $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'draw-candidates-' . uniqid('', true) . '.csv';
-        file_put_contents($tmp, implode(PHP_EOL, $users) . PHP_EOL, LOCK_EX);
-
-        return ['path' => $tmp, 'temporary' => true];
+        return $total;
     }
 }

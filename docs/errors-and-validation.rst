@@ -25,6 +25,23 @@ Common checks performed by handlers:
 - numeric/positive weights in weighted methods
 - method-specific required item keys
 - strict lucky `amountMode` to payload matching
+- strict integer and boolean option types
+- finite numeric values and unique item/phase identifiers
+- bounded draw counts, campaign slots, candidates, and simulation iterations
+
+Validation cannot be disabled with `options.check`; the key is accepted only for backward compatibility.
+
+Operational Limits
+------------------
+
+- up to 10,000 item definitions per request or campaign phase
+- up to 100,000 requested draws or campaign slots
+- up to 1,000 campaign batch phases
+- up to 1,000,000 candidate rows or IDs
+- up to 100,000 simulation iterations
+- up to 100,000,000 candidate evaluations per campaign request
+
+These limits bound response size, memory growth, and synchronous work. Split larger workloads into application-controlled batches.
 
 Partial Results vs Exceptions
 -----------------------------

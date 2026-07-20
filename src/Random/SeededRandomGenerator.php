@@ -15,6 +15,6 @@ class SeededRandomGenerator extends AbstractRandomGenerator
 
     public function seedFingerprint(): ?string
     {
-        return hash('xxh3', 'seed:' . $this->seed);
+        return hash('sha256', 'infocyph.game-draw.seed:' . $this->seed);
     }
 }

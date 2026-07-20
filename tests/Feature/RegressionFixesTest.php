@@ -4,6 +4,8 @@ use Infocyph\Draw\Audit\AuditTrail;
 use Infocyph\Draw\Draw;
 use Infocyph\Draw\Exceptions\ValidationException;
 use Infocyph\Draw\Random\SeededRandomGenerator;
+use Infocyph\Draw\Rules\RuleSet;
+use Infocyph\Draw\State\MemoryCacheItem;
 use Infocyph\Draw\State\MemoryCachePool;
 
 test('grand fully fills from remaining pool even with retryCount set to one', function () {
@@ -193,9 +195,34 @@ test('audit trail supports cryptographic verify flow', function () {
     $secret = 'secret-key';
     $audit = AuditTrail::create($configuration, $result, $seedFingerprint, $secret);
 
-    expect($audit['signatureAlgorithm'])->toBe('hmac-sha256')
+    expect($audit['version'])->toBe(2)
+        ->and($audit['configHash'])->toHaveLength(64)
+        ->and($audit['resultHash'])->toHaveLength(64)
+        ->and($audit['signatureAlgorithm'])->toBe('hmac-sha256')
         ->and(AuditTrail::verify($audit, $configuration, $result, $seedFingerprint, $secret))->toBeTrue()
         ->and(AuditTrail::verify($audit, $configuration, ['a' => ['u2']], $seedFingerprint, $secret))->toBeFalse();
+
+    $audit['signatureAlgorithm'] = 'sha256';
+    expect(AuditTrail::verify($audit, $configuration, $result, $seedFingerprint, $secret))->toBeFalse();
+});
+
+test('audit verification remains compatible with unversioned artifacts', function () {
+    $configuration = ['feature' => 'legacy'];
+    $result = ['winner' => 'u1'];
+    $generatedAt = '2026-01-01T00:00:00+00:00';
+    $configHash = hash('xxh3', json_encode($configuration, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    $resultHash = hash('xxh3', json_encode($result, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    $payload = implode('|', [$generatedAt, $configHash, $resultHash, 'seed']);
+    $audit = [
+        'generatedAt' => $generatedAt,
+        'configHash' => $configHash,
+        'resultHash' => $resultHash,
+        'signatureAlgorithm' => 'hmac-sha256',
+        'signaturePayload' => $payload,
+        'signature' => hash_hmac('sha256', $payload, 'secret'),
+    ];
+
+    expect(AuditTrail::verify($audit, $configuration, $result, 'seed', 'secret'))->toBeTrue();
 });
 
 test('draw request fingerprint is stable for equivalent payloads', function () {
@@ -211,5 +238,109 @@ test('draw request fingerprint is stable for equivalent payloads', function () {
     ];
 
     expect(Draw::requestFingerprint($requestA))
-        ->toBe(Draw::requestFingerprint($requestB));
+        ->toBe(Draw::requestFingerprint($requestB))
+        ->and(Draw::requestFingerprint($requestA))->toHaveLength(64);
+});
+
+test('validation cannot be disabled through the check option', function () {
+    $draw = new Draw(new SeededRandomGenerator(709));
+
+    expect(fn () => $draw->execute([
+        'method' => 'lucky',
+        'items' => [[
+            'item' => 'gift',
+            'chances' => 1,
+            'amountMode' => 'list',
+            'amounts' => [],
+        ]],
+        'options' => ['check' => false],
+    ]))->toThrow(ValidationException::class);
+});
+
+test('numeric and boolean options use strict boundary types', function () {
+    $draw = new Draw(new SeededRandomGenerator(710));
+
+    expect(fn () => $draw->execute([
+        'method' => 'roundRobin',
+        'items' => [['name' => 'gift']],
+        'options' => ['count' => '2'],
+    ]))->toThrow(ValidationException::class)
+        ->and(fn () => $draw->execute([
+            'method' => 'batched',
+            'items' => [['name' => 'gift']],
+            'options' => ['withReplacement' => 1],
+        ]))->toThrow(ValidationException::class);
+});
+
+test('campaign cache keys support psr reserved identifiers', function () {
+    $draw = new Draw(new SeededRandomGenerator(711));
+    $result = $draw->execute([
+        'method' => 'campaign.run',
+        'items' => ['gift@daily' => ['count' => 1, 'group' => 'group/main']],
+        'candidates' => ['user:1'],
+        'options' => [
+            'cachePool' => new MemoryCachePool(),
+            'rules' => ['groupQuota' => ['group/main' => 1]],
+        ],
+    ]);
+
+    expect($result['entries'])->toHaveCount(1)
+        ->and($result['entries'][0]['candidateId'])->toBe('user:1');
+});
+
+test('campaign rejects malformed rules and duplicate phase names before drawing', function () {
+    $draw = new Draw(new SeededRandomGenerator(712));
+
+    expect(fn () => RuleSet::fromArray(['perUserCap' => '1']))->toThrow(ValidationException::class)
+        ->and(fn () => $draw->execute([
+            'method' => 'campaign.batch',
+            'candidates' => ['u1'],
+            'options' => [
+                'phases' => [
+                    ['name' => 'same', 'items' => ['a' => ['count' => 1]]],
+                    ['name' => 'same', 'items' => ['b' => ['count' => 1]]],
+                ],
+            ],
+        ]))->toThrow(ValidationException::class);
+});
+
+test('zero-slot simulation reports a fulfilled zero-slot result', function () {
+    $draw = new Draw(new SeededRandomGenerator(713));
+    $result = $draw->execute([
+        'method' => 'campaign.simulate',
+        'items' => ['gift' => ['count' => 0]],
+        'candidates' => ['u1', 'u2'],
+        'options' => ['iterations' => 2],
+    ]);
+
+    expect($result['raw']['totalSlots'])->toBe(0)
+        ->and($result['meta']['requestedCount'])->toBe(2)
+        ->and($result['meta']['returnedCount'])->toBe(2)
+        ->and($result['meta']['fulfilled'])->toBeTrue();
+});
+
+test('negative cache expiration creates an expired item without a type error', function () {
+    $item = new MemoryCacheItem('expired');
+    $item->set('value')->expiresAfter(-1);
+
+    expect($item->expiration())->not->toBeNull()
+        ->and($item->expiration()?->getTimestamp())->toBeLessThanOrEqual(time());
+});
+
+test('aggregate slot limits fail safely before integer overflow', function () {
+    $draw = new Draw(new SeededRandomGenerator(714));
+
+    expect(fn () => $draw->execute([
+        'method' => 'grand',
+        'items' => ['a' => PHP_INT_MAX, 'b' => PHP_INT_MAX],
+        'candidates' => ['u1'],
+    ]))->toThrow(ValidationException::class)
+        ->and(fn () => $draw->execute([
+            'method' => 'campaign.run',
+            'items' => [
+                'a' => ['count' => PHP_INT_MAX],
+                'b' => ['count' => PHP_INT_MAX],
+            ],
+            'candidates' => ['u1'],
+        ]))->toThrow(ValidationException::class);
 });

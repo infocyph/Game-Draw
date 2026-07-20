@@ -8,6 +8,8 @@ use Infocyph\Draw\Exceptions\ValidationException;
 
 class WeightedBatchDraw
 {
+    private const MAX_DRAW_COUNT = 100_000;
+
     public function __construct(private readonly ProbabilityDraw $probabilityDraw) {}
 
     /**
@@ -15,8 +17,8 @@ class WeightedBatchDraw
      */
     public function draw(FlexibleState $state, int $count): array
     {
-        if ($count <= 0) {
-            throw new ValidationException('Count must be a positive integer.');
+        if ($count <= 0 || $count > self::MAX_DRAW_COUNT) {
+            throw new ValidationException('Count must be between 1 and 100000.');
         }
 
         $results = [];

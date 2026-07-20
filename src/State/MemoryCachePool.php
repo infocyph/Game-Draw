@@ -50,7 +50,7 @@ class MemoryCachePool implements CacheItemPoolInterface
     public function deleteItems(array $keys): bool
     {
         foreach ($keys as $key) {
-            $this->deleteItem($key);
+            $this->deleteItem($this->assertedKey($key));
         }
 
         return true;
@@ -82,6 +82,7 @@ class MemoryCachePool implements CacheItemPoolInterface
         /** @var array<string, CacheItemInterface> $items */
         $items = [];
         foreach ($keys as $key) {
+            $key = $this->assertedKey($key);
             $items[$key] = $this->getItem($key);
         }
 
@@ -90,7 +91,18 @@ class MemoryCachePool implements CacheItemPoolInterface
 
     public function hasItem(string $key): bool
     {
-        return $this->getItem($key)->isHit();
+        $this->assertValidKey($key);
+        $stored = $this->store[$key] ?? null;
+        if ($stored === null) {
+            return false;
+        }
+        if (!$this->isExpired($stored['expiresAt'])) {
+            return true;
+        }
+
+        unset($this->store[$key]);
+
+        return false;
     }
 
     public function save(CacheItemInterface $item): bool
@@ -120,6 +132,15 @@ class MemoryCachePool implements CacheItemPoolInterface
         );
 
         return true;
+    }
+
+    private function assertedKey(mixed $key): string
+    {
+        if (!is_string($key)) {
+            throw new InvalidCacheKeyException('Cache keys must be strings.');
+        }
+
+        return $key;
     }
 
     private function assertValidKey(string $key): void

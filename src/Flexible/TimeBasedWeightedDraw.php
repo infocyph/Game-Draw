@@ -17,24 +17,15 @@ class TimeBasedWeightedDraw
         if ($state->items === []) {
             throw new EmptyPoolException('No items left to draw.');
         }
-        $state->ensureLastPickedTimestampsInitialized();
+        $state->ensureTimeStateInitialized();
 
         $currentTime = microtime(true);
-        $intervalThresholds = [
-            'minute' => 60,
-            'hourly' => 60 * 60,
-            'daily' => 24 * 60 * 60,
-            'weekly' => 7 * 24 * 60 * 60,
-            'monthly' => 30 * 24 * 60 * 60,
-        ];
-
         $weightedItems = [];
         $itemIndexes = [];
         foreach ($state->items as $index => $item) {
             $name = $state->itemName($index);
-            $time = $state->itemTime($index);
             $lastPicked = $state->lastPickedTimestamps[$name] ?? 0.0;
-            $threshold = $intervalThresholds[$time] ?? $intervalThresholds['daily'];
+            $threshold = $state->itemTimeThreshold($index);
             $elapsed = max(0.0, $currentTime - $lastPicked);
             $urgencyBoost = max(1.0, $elapsed / $threshold);
 

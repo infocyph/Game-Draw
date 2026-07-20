@@ -26,6 +26,10 @@ class ItemMethodHandler implements MethodHandlerInterface
 {
     use NormalizesHandlerInput;
 
+    private const MAX_DRAW_COUNT = 100_000;
+
+    private const MAX_ITEMS = 10_000;
+
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     /**
@@ -36,6 +40,9 @@ class ItemMethodHandler implements MethodHandlerInterface
     {
         $method = $this->requiredString($request['method'] ?? null, 'method');
         $itemsRaw = $this->requireNonEmptyArray($request['items'] ?? null, 'items is required and must be a non-empty array.');
+        if (count($itemsRaw) > self::MAX_ITEMS) {
+            throw new ValidationException('items cannot contain more than 10000 entries.');
+        }
         if (!in_array($method, $this->methods(), true)) {
             throw new ValidationException("Unsupported item draw method: {$method}");
         }
@@ -128,14 +135,15 @@ class ItemMethodHandler implements MethodHandlerInterface
      */
     private function executeFlexible(string $method, array $items, array $options): array
     {
-        $count = max(1, $this->intValue($options['count'] ?? null, 1));
-        $withReplacement = $this->boolValue($options['withReplacement'] ?? false);
-        $check = $this->boolValue($options['check'] ?? true);
+        $count = $this->intValue($options['count'] ?? null, 1, 'options.count');
+        if ($count < 1 || $count > self::MAX_DRAW_COUNT) {
+            throw new ValidationException('options.count must be between 1 and 100000.');
+        }
+        $withReplacement = $this->boolValue($options['withReplacement'] ?? false, 'options.withReplacement');
+        $this->boolValue($options['check'] ?? true, 'options.check');
 
         $state = new FlexibleState($items);
-        if ($check) {
-            $this->checkFlexible($state->items, $method);
-        }
+        $this->checkFlexible($state->items, $method);
 
         if (in_array($method, ['batched', 'weightedBatch'], true)) {
             $batch = $this->drawFlexibleBatch($method, $state, $count, $withReplacement);
