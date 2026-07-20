@@ -16,6 +16,10 @@ class LuckyMethodHandler implements MethodHandlerInterface
 {
     use NormalizesHandlerInput;
 
+    private const MAX_DRAW_COUNT = 100_000;
+
+    private const MAX_ITEMS = 10_000;
+
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     /**
@@ -28,16 +32,29 @@ class LuckyMethodHandler implements MethodHandlerInterface
             $request['items'] ?? null,
             'items is required and must be a non-empty array.',
         );
+        if (count($items) > self::MAX_ITEMS) {
+            throw new ValidationException('items cannot contain more than 10000 entries.');
+        }
         $options = $this->normalizeAssocArray($request['options'] ?? [], 'options');
-        $count = max(1, $this->intValue($options['count'] ?? null, 1));
-        $check = $this->boolValue($options['check'] ?? true);
-        $normalizedItems = $this->normalizeLuckyItems($this->normalizeRows($items), $check);
+        $count = $this->intValue($options['count'] ?? null, 1, 'options.count');
+        if ($count < 1 || $count > self::MAX_DRAW_COUNT) {
+            throw new ValidationException('options.count must be between 1 and 100000.');
+        }
+        $this->boolValue($options['check'] ?? true, 'options.check');
+        $normalizedItems = $this->normalizeLuckyItems($this->normalizeRows($items));
+        $itemsById = [];
+        $chanceWeights = [];
+        foreach ($normalizedItems as $item) {
+            $itemsById[$item['item']] = $item;
+            $chanceWeights[$item['item']] = $item['chances'];
+        }
+        $preparedChanceWeights = $this->prepareWeighted($chanceWeights);
 
         $entries = [];
         $raw = [];
 
         for ($i = 0; $i < $count; $i++) {
-            $pick = $this->pickLucky($normalizedItems);
+            $pick = $this->pickLucky($itemsById, $preparedChanceWeights);
             $raw[] = $pick;
             $entries[] = ResultBuilder::entry(
                 itemId: $pick['item'],
@@ -174,6 +191,19 @@ class LuckyMethodHandler implements MethodHandlerInterface
         return $normalized;
     }
 
+    private function normalizeIntegerString(string $value, string $field): int
+    {
+        $unsigned = ltrim($value, '+-');
+        $digits = ltrim($unsigned, '0');
+        $digits = $digits === '' ? '0' : $digits;
+        $limit = str_starts_with($value, '-') ? substr((string) PHP_INT_MIN, 1) : (string) PHP_INT_MAX;
+        if (strlen($digits) > strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
+            throw new ValidationException("{$field} exceeds the platform integer range.");
+        }
+
+        return (int) $value;
+    }
+
     /**
      * @param list<array<string, mixed>> $items
      * @return list<array{
@@ -183,7 +213,7 @@ class LuckyMethodHandler implements MethodHandlerInterface
      *   amounts: list<float|int>|array<string, float|int|string>|string
      * }>
      */
-    private function normalizeLuckyItems(array $items, bool $check): array
+    private function normalizeLuckyItems(array $items): array
     {
         DrawValidator::assertRequiredKeys(
             $items,
@@ -192,8 +222,14 @@ class LuckyMethodHandler implements MethodHandlerInterface
         );
 
         $normalized = [];
+        $seenItemIds = [];
         foreach ($items as $index => $item) {
             $itemId = $this->requiredString($item['item'] ?? null, "Item at index {$index} item");
+            if (isset($seenItemIds[$itemId])) {
+                throw new ValidationException("Item id '{$itemId}' must be unique.");
+            }
+            $seenItemIds[$itemId] = true;
+
             $chances = $this->normalizeNumericValue($item['chances'] ?? null, "Chances for '{$itemId}'");
             if ($this->numericAsFloat($chances, "Chances for '{$itemId}'") <= 0) {
                 throw new ValidationException("Chances for '{$itemId}' must be greater than zero.");
@@ -203,9 +239,7 @@ class LuckyMethodHandler implements MethodHandlerInterface
             $amounts = $item['amounts'];
             $resolvedMode = $this->resolveAmountMode($amounts, $mode, $itemId);
 
-            if ($check) {
-                $this->validateAmountsByMode($resolvedMode, $amounts, $itemId);
-            }
+            $this->validateAmountsByMode($resolvedMode, $amounts, $itemId);
 
             $normalized[] = [
                 'item' => $itemId,
@@ -232,15 +266,24 @@ class LuckyMethodHandler implements MethodHandlerInterface
     private function normalizeNumericValue(mixed $value, string $field): float|int
     {
         if (is_int($value) || is_float($value)) {
-            return $value;
+            if (is_int($value) || is_finite($value)) {
+                return $value;
+            }
+
+            throw new ValidationException("{$field} must be finite.");
         }
         if (!is_string($value) || !is_numeric($value)) {
             throw new ValidationException("{$field} must be numeric.");
         }
 
-        return str_contains($value, '.') || stripos($value, 'e') !== false
+        $normalized = str_contains($value, '.') || stripos($value, 'e') !== false
             ? (float) $value
-            : (int) $value;
+            : $this->normalizeIntegerString($value, $field);
+        if (is_float($normalized) && !is_finite($normalized)) {
+            throw new ValidationException("{$field} must be finite.");
+        }
+
+        return $normalized;
     }
 
     /**
@@ -261,28 +304,27 @@ class LuckyMethodHandler implements MethodHandlerInterface
     }
 
     /**
-     * @param list<array{
+     * @param array<string, array{
      *   item: string,
      *   chances: float|int,
      *   amountMode: 'list'|'weighted'|'range',
      *   amounts: list<float|int>|array<string, float|int|string>|string
-     * }> $items
+     * }> $itemsById
+     * @param array<string, int> $preparedChanceWeights
      * @return array{item: string, amount: float|int}
      */
-    private function pickLucky(array $items): array
+    private function pickLucky(array $itemsById, array $preparedChanceWeights): array
     {
-        $preparedItems = $this->prepareWeighted(array_column($items, 'chances', 'item'));
-        if ($preparedItems === []) {
+        if ($preparedChanceWeights === []) {
             throw new ValidationException('At least one item must have a positive chance.');
         }
 
-        $pickedItem = $this->drawWeighted($preparedItems);
-        $index = array_search($pickedItem, array_column($items, 'item'), true);
-        if (!is_int($index)) {
+        $pickedItem = $this->drawWeighted($preparedChanceWeights);
+        if (!isset($itemsById[$pickedItem])) {
             throw new ValidationException('Selected item could not be resolved.');
         }
 
-        $item = $items[$index];
+        $item = $itemsById[$pickedItem];
         $amount = match ($item['amountMode']) {
             'range' => $this->weightedAmountRange($this->requiredString($item['amounts'], 'range amounts')),
             'list' => $this->pickListAmount($this->asNumericList($item['amounts'])),

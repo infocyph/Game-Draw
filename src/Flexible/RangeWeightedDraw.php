@@ -29,11 +29,13 @@ class RangeWeightedDraw
             $randomWeight -= $weight['weight'];
             if ($randomWeight <= 0) {
                 $range = $state->ranges[$weight['index']];
+                $min = $this->normalizeBoundary($range['min']);
+                $max = $this->normalizeBoundary($range['max']);
+                if ($min >= $max) {
+                    throw new ValidationException('Range minimum must be less than maximum.');
+                }
 
-                return $this->randomInRange(
-                    $this->normalizeBoundary($range['min']),
-                    $this->normalizeBoundary($range['max']),
-                );
+                return $this->randomInRange($min, $max);
             }
         }
 
@@ -42,11 +44,43 @@ class RangeWeightedDraw
 
     private function normalizeBoundary(int|float|string $value): float|int
     {
-        $valueAsString = is_string($value) ? trim($value) : (string) $value;
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            if (!is_finite($value)) {
+                throw new ValidationException('Range boundaries must be finite.');
+            }
 
-        return preg_match('/^-?\d+$/', $valueAsString) === 1
-            ? (int) $valueAsString
+            return $value;
+        }
+
+        $valueAsString = trim($value);
+        if ($valueAsString === '' || !is_numeric($valueAsString)) {
+            throw new ValidationException('Range boundaries must be numeric.');
+        }
+
+        $normalized = preg_match('/^[+-]?\d+$/', $valueAsString) === 1
+            ? $this->normalizeInteger($valueAsString)
             : (float) $valueAsString;
+        if (is_float($normalized) && !is_finite($normalized)) {
+            throw new ValidationException('Range boundaries must be finite.');
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeInteger(string $value): int
+    {
+        $negative = str_starts_with($value, '-');
+        $digits = ltrim(ltrim($value, '+-'), '0');
+        $digits = $digits === '' ? '0' : $digits;
+        $limit = $negative ? substr((string) PHP_INT_MIN, 1) : (string) PHP_INT_MAX;
+        if (strlen($digits) > strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
+            throw new ValidationException('Integer range boundary exceeds the platform integer range.');
+        }
+
+        return (int) $value;
     }
 
     private function randomInRange(float|int $min, float|int $max): float|int

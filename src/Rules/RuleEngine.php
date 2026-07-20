@@ -4,11 +4,23 @@ declare(strict_types=1);
 
 namespace Infocyph\Draw\Rules;
 
-use Infocyph\Draw\Support\ScalarValue;
+use Infocyph\Draw\Exceptions\ValidationException;
 use Psr\Cache\CacheItemPoolInterface;
 
 class RuleEngine
 {
+    /**
+     * Request-scoped cache of PSR-6 values already read or written by this engine.
+     *
+     * @var array<string, int>
+     */
+    private array $cachedValues = [];
+
+    /**
+     * @var array<string, string>
+     */
+    private array $resolvedKeys = [];
+
     public function __construct(
         private readonly RuleSet $rules,
         private readonly CacheItemPoolInterface $cachePool,
@@ -32,7 +44,7 @@ class RuleEngine
             }
         }
 
-        if ($group !== null && array_key_exists($group, $this->rules->groupQuota)) {
+        if ($group !== null && isset($this->rules->groupQuota[$group])) {
             $groupWins = $this->readInt($this->groupWinsKey($group));
             if ($groupWins >= $this->rules->groupQuota[$group]) {
                 return [false, 'group_quota_reached'];
@@ -59,40 +71,74 @@ class RuleEngine
         $this->setKeyValue($this->userLastWinKey($userId), $timestamp);
     }
 
+    private function cacheKey(string $scope, string $identifier): string
+    {
+        $lookupKey = $scope . "\0" . $identifier;
+        if (isset($this->resolvedKeys[$lookupKey])) {
+            return $this->resolvedKeys[$lookupKey];
+        }
+
+        $legacyKey = "rules.{$scope}.{$identifier}";
+        if (strlen($legacyKey) <= 64 && preg_match('/[{}()\\/\\\\@:]/', $legacyKey) !== 1) {
+            return $this->resolvedKeys[$lookupKey] = $legacyKey;
+        }
+
+        $digest = rtrim(strtr(base64_encode(hash('sha256', $lookupKey, true)), '+/', '-_'), '=');
+
+        return $this->resolvedKeys[$lookupKey] = "r.{$scope}.{$digest}";
+    }
+
     private function groupWinsKey(string $group): string
     {
-        return "rules.group_wins.{$group}";
+        return $this->cacheKey('group_wins', $group);
     }
 
     private function incrementKey(string $key, int $by = 1): int
     {
         $item = $this->cachePool->getItem($key);
         $current = $item->isHit() ? $this->readRawInt($item->get()) : 0;
+        if ($by > PHP_INT_MAX - $current) {
+            throw new ValidationException('Rule state counter exceeds the platform integer range.');
+        }
         $updated = $current + $by;
         $item->set($updated);
         $this->cachePool->save($item);
+        $this->cachedValues[$key] = $updated;
 
         return $updated;
     }
 
     private function itemWinsKey(string $itemId): string
     {
-        return "rules.item_wins.{$itemId}";
+        return $this->cacheKey('item_wins', $itemId);
     }
 
     private function readInt(string $key): int
     {
+        if (isset($this->cachedValues[$key])) {
+            return $this->cachedValues[$key];
+        }
+
         $item = $this->cachePool->getItem($key);
         if (!$item->isHit()) {
+            $this->cachedValues[$key] = 0;
+
             return 0;
         }
 
-        return ScalarValue::toInt($item->get(), 0);
+        $value = $this->readRawInt($item->get());
+        $this->cachedValues[$key] = $value;
+
+        return $value;
     }
 
     private function readRawInt(mixed $value): int
     {
-        return ScalarValue::toInt($value, 0);
+        if (!is_int($value) || $value < 0) {
+            throw new ValidationException('Rule state values must be non-negative integers.');
+        }
+
+        return $value;
     }
 
     private function setKeyValue(string $key, mixed $value): void
@@ -100,15 +146,16 @@ class RuleEngine
         $item = $this->cachePool->getItem($key);
         $item->set($value);
         $this->cachePool->save($item);
+        $this->cachedValues[$key] = $this->readRawInt($value);
     }
 
     private function userLastWinKey(string $userId): string
     {
-        return "rules.user_last_win.{$userId}";
+        return $this->cacheKey('user_last_win', $userId);
     }
 
     private function userWinsKey(string $userId): string
     {
-        return "rules.user_wins.{$userId}";
+        return $this->cacheKey('user_wins', $userId);
     }
 }

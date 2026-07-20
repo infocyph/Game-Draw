@@ -5,33 +5,48 @@ declare(strict_types=1);
 namespace Infocyph\Draw\Unified\Handlers\Support;
 
 use Infocyph\Draw\Exceptions\ValidationException;
-use Infocyph\Draw\Support\ScalarValue;
 
 trait NormalizesHandlerInput
 {
-    protected function boolValue(mixed $value): bool
+    protected function boolValue(mixed $value, string $field): bool
     {
-        return match (true) {
-            is_bool($value) => $value,
-            is_int($value) => $value !== 0,
-            is_string($value) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
-            default => (bool) $value,
-        };
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        throw new ValidationException("{$field} must be a boolean.");
     }
 
     protected function floatValue(mixed $value, float $default): float
     {
-        return match (true) {
-            is_int($value) => (float) $value,
-            is_float($value) => $value,
-            is_string($value) && is_numeric($value) => (float) $value,
-            default => $default,
-        };
+        if ($value === null) {
+            return $default;
+        }
+        if (is_int($value) || is_float($value)) {
+            $normalized = (float) $value;
+        } elseif (is_string($value) && is_numeric($value)) {
+            $normalized = (float) $value;
+        } else {
+            throw new ValidationException('Numeric value must be finite.');
+        }
+
+        if (!is_finite($normalized)) {
+            throw new ValidationException('Numeric value must be finite.');
+        }
+
+        return $normalized;
     }
 
-    protected function intValue(mixed $value, int $default): int
+    protected function intValue(mixed $value, int $default, string $field): int
     {
-        return ScalarValue::toInt($value, $default);
+        if ($value === null) {
+            return $default;
+        }
+        if (!is_int($value)) {
+            throw new ValidationException("{$field} must be an integer.");
+        }
+
+        return $value;
     }
 
     /**
@@ -46,6 +61,36 @@ trait NormalizesHandlerInput
         $normalized = [];
         foreach ($value as $key => $item) {
             $normalized[(string) $key] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $candidates
+     * @return list<string>
+     */
+    protected function normalizeCandidateIds(array $candidates, int $maximum): array
+    {
+        if (count($candidates) > $maximum) {
+            throw new ValidationException("candidates exceeds the {$maximum} candidate limit.");
+        }
+
+        $normalized = [];
+        $seen = [];
+        foreach ($candidates as $index => $candidate) {
+            if (!is_string($candidate) || trim($candidate) === '') {
+                throw new ValidationException("Candidate at index {$index} must be a non-empty string.");
+            }
+
+            $candidate = trim($candidate);
+            if (!isset($seen[$candidate])) {
+                $seen[$candidate] = true;
+                $normalized[] = $candidate;
+            }
+        }
+        if (count($normalized) > $maximum) {
+            throw new ValidationException("candidates exceeds the {$maximum} candidate limit.");
         }
 
         return $normalized;
@@ -75,20 +120,27 @@ trait NormalizesHandlerInput
 
     protected function numericAsFloat(mixed $value, string $field): float
     {
+        $normalized = null;
         if (is_int($value) || is_float($value)) {
-            return (float) $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (float) $value;
+            $normalized = (float) $value;
+        } elseif (is_string($value) && is_numeric($value)) {
+            $normalized = (float) $value;
         }
 
-        throw new ValidationException("{$field} must be numeric.");
+        if ($normalized === null || !is_finite($normalized)) {
+            throw new ValidationException("{$field} must be a finite numeric value.");
+        }
+
+        return $normalized;
     }
 
     protected function optionalString(mixed $value): ?string
     {
-        if (!is_string($value)) {
+        if ($value === null) {
             return null;
+        }
+        if (!is_string($value)) {
+            throw new ValidationException('Optional string value must be a string when provided.');
         }
 
         $trimmed = trim($value);

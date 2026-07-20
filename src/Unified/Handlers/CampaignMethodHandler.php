@@ -22,6 +22,18 @@ class CampaignMethodHandler implements MethodHandlerInterface
 {
     use NormalizesHandlerInput;
 
+    private const MAX_CANDIDATES = 1_000_000;
+
+    private const MAX_EVALUATIONS = 100_000_000;
+
+    private const MAX_ITEMS = 10_000;
+
+    private const MAX_ITERATIONS = 100_000;
+
+    private const MAX_PHASES = 1_000;
+
+    private const MAX_TOTAL_SLOTS = 100_000;
+
     public function __construct(private readonly RandomGeneratorInterface $random) {}
 
     /**
@@ -31,50 +43,58 @@ class CampaignMethodHandler implements MethodHandlerInterface
     public function execute(array $request): array
     {
         $context = $this->prepareExecutionContext($request);
-        $method = $context['method'];
-        $options = $context['options'];
-        $users = $context['users'];
-        $items = $context['items'];
-        $rules = $context['rules'];
-        $auditSecret = $context['auditSecret'];
-        $eligibility = $context['eligibility'];
-        $cachePool = $context['cachePool'];
-        $random = $context['random'];
 
-        return match ($method) {
+        return match ($context['method']) {
             'campaign.run' => $this->runCampaign(
-                users: $users,
-                items: $items,
-                rules: $rules,
-                auditSecret: $auditSecret,
-                options: $options,
-                eligibility: $eligibility,
-                cachePool: $cachePool,
-                random: $random,
+                users: $context['users'],
+                items: $context['items'],
+                rules: $context['rules'],
+                auditSecret: $context['auditSecret'],
+                options: $context['options'],
+                eligibility: $context['eligibility'],
+                cachePool: $context['cachePool'],
+                random: $context['random'],
             ),
             'campaign.batch' => $this->runBatch(
-                users: $users,
-                defaultRules: $rules,
-                auditSecret: $auditSecret,
-                options: $options,
-                eligibility: $eligibility,
-                cachePool: $cachePool,
-                random: $random,
+                users: $context['users'],
+                defaultRules: $context['rules'],
+                auditSecret: $context['auditSecret'],
+                options: $context['options'],
+                eligibility: $context['eligibility'],
+                cachePool: $context['cachePool'],
+                random: $context['random'],
             ),
             'campaign.simulate' => $this->simulate(
-                users: $users,
-                items: $items,
-                rules: $rules,
-                options: $options,
-                eligibility: $eligibility,
+                users: $context['users'],
+                items: $context['items'],
+                rules: $context['rules'],
+                options: $context['options'],
+                eligibility: $context['eligibility'],
             ),
-            default => throw new ValidationException("Unsupported campaign method: {$method}"),
+            default => throw new ValidationException("Unsupported campaign method: {$context['method']}"),
         };
     }
 
     public function methods(): array
     {
         return ['campaign.run', 'campaign.batch', 'campaign.simulate'];
+    }
+
+    private function assertEvaluationBudget(int $slots, int $candidates, int $multiplier = 1): void
+    {
+        if ($slots === 0) {
+            return;
+        }
+
+        $maximumCandidates = intdiv(self::MAX_EVALUATIONS, $slots);
+        if ($candidates > $maximumCandidates) {
+            throw new ValidationException('The campaign workload exceeds 100000000 candidate evaluations.');
+        }
+
+        $evaluations = $slots * $candidates;
+        if ($multiplier > intdiv(self::MAX_EVALUATIONS, $evaluations)) {
+            throw new ValidationException('The campaign workload exceeds 100000000 candidate evaluations.');
+        }
     }
 
     private function firstDefinedString(mixed $first, mixed $second): string
@@ -88,45 +108,79 @@ class CampaignMethodHandler implements MethodHandlerInterface
     }
 
     /**
+     * @param array<string, int> $itemWins
+     * @return array<string, array{wins: int, avgPerIteration: float}>
+     */
+    private function itemDistribution(array $itemWins, int $iterations): array
+    {
+        $distribution = [];
+        foreach ($itemWins as $item => $wins) {
+            $distribution[$item] = [
+                'wins' => $wins,
+                'avgPerIteration' => $wins / $iterations,
+            ];
+        }
+
+        return $distribution;
+    }
+
+    /**
+     * @return array{id: string, count: int, weight: float, group: ?string}
+     */
+    private function normalizeItem(int|string $itemKey, mixed $definition): array
+    {
+        if (is_int($definition)) {
+            $itemId = is_string($itemKey) ? trim($itemKey) : '';
+            $count = $definition;
+            $weight = 1.0;
+            $group = null;
+        } elseif (is_array($definition)) {
+            $itemId = is_string($itemKey) ? trim($itemKey) : $this->firstDefinedString(
+                $definition['item'] ?? null,
+                $definition['name'] ?? null,
+            );
+            $count = $this->intValue($definition['count'] ?? null, 1, "Item '{$itemId}' count");
+            $weight = $this->floatValue($definition['weight'] ?? null, 1.0);
+            $group = $this->optionalString($definition['group'] ?? null);
+        } else {
+            throw new ValidationException('Each campaign item must be an integer count or an item definition array.');
+        }
+
+        if ($itemId === '') {
+            throw new ValidationException('Each campaign item must have a valid string identifier.');
+        }
+
+        DrawValidator::assertNonNegativeInt($count, "Item count for '{$itemId}'");
+        DrawValidator::assertNonNegativeNumeric($weight, "Item weight for '{$itemId}'");
+
+        return ['id' => $itemId, 'count' => $count, 'weight' => $weight, 'group' => $group];
+    }
+
+    /**
      * @param array<int|string, mixed> $items
      * @return array<string, array{count: int, weight: float, group: ?string}>
      */
     private function normalizeItems(array $items): array
     {
         DrawValidator::assertNotEmpty($items, 'Items array must contain at least one item.');
+        DrawValidator::assertCountAtMost($items, self::MAX_ITEMS, 'items');
         $normalized = [];
 
         foreach ($items as $itemKey => $itemDefinition) {
-            $itemId = '';
-            $count = 1;
-            $weight = 1.0;
-            $group = null;
-
-            if (is_array($itemDefinition)) {
-                $itemId = is_string($itemKey) ? trim($itemKey) : $this->firstDefinedString(
-                    $itemDefinition['item'] ?? null,
-                    $itemDefinition['name'] ?? null,
-                );
-                $count = max(0, $this->intValue($itemDefinition['count'] ?? null, 1));
-                $weight = max(0.0, $this->floatValue($itemDefinition['weight'] ?? null, 1.0));
-                $group = $this->optionalString($itemDefinition['group'] ?? null);
-            } elseif (is_int($itemDefinition)) {
-                $itemId = is_string($itemKey) ? trim($itemKey) : '';
-                $count = max(0, $itemDefinition);
+            $item = $this->normalizeItem($itemKey, $itemDefinition);
+            $itemId = $item['id'];
+            if (isset($normalized[$itemId])) {
+                throw new ValidationException("Campaign item id '{$itemId}' must be unique.");
             }
 
-            if ($itemId === '') {
-                throw new ValidationException('Each campaign item must have a valid string identifier.');
-            }
-
-            DrawValidator::assertNonNegativeInt($count, "Item count for '{$itemId}'");
-            DrawValidator::assertNonNegativeNumeric($weight, "Item weight for '{$itemId}'");
             $normalized[$itemId] = [
-                'count' => $count,
-                'weight' => $weight,
-                'group' => $group,
+                'count' => $item['count'],
+                'weight' => $item['weight'],
+                'group' => $item['group'],
             ];
         }
+
+        $this->sumItemCounts($normalized);
 
         return $normalized;
     }
@@ -137,18 +191,43 @@ class CampaignMethodHandler implements MethodHandlerInterface
      */
     private function normalizeUsers(array $users): array
     {
-        $normalized = [];
-        foreach ($users as $user) {
-            $userId = $this->optionalString($user);
-            if ($userId !== null) {
-                $normalized[] = $userId;
-            }
-        }
-
-        $normalized = array_values(array_unique($normalized));
+        $normalized = $this->normalizeCandidateIds($users, self::MAX_CANDIDATES);
         DrawValidator::assertNotEmpty($normalized, 'candidates must contain at least one user id.');
 
         return $normalized;
+    }
+
+    /**
+     * @return array{
+     *   name: string,
+     *   items: array<string, array{count: int, weight: float, group: ?string}>,
+     *   rules: RuleSet,
+     *   random: RandomGeneratorInterface
+     * }
+     */
+    private function prepareBatchPhase(
+        int|string $index,
+        mixed $phaseRaw,
+        RuleSet $defaultRules,
+        RandomGeneratorInterface $random,
+    ): array {
+        if (!is_array($phaseRaw)) {
+            throw new ValidationException("Phase at index {$index} must be an array.");
+        }
+
+        $phaseName = $this->resolvePhaseName($index, $phaseRaw);
+        if (!isset($phaseRaw['items']) || !is_array($phaseRaw['items'])) {
+            throw new ValidationException("Phase '{$phaseName}' must define items.");
+        }
+
+        return [
+            'name' => $phaseName,
+            'items' => $this->normalizeItems($phaseRaw['items']),
+            'rules' => $this->resolvePhaseRules($phaseRaw['rules'] ?? $defaultRules, $phaseName),
+            'random' => array_key_exists('seed', $phaseRaw)
+                ? new SeededRandomGenerator($this->intValue($phaseRaw['seed'], 0, "Phase '{$phaseName}' seed"))
+                : $random,
+        ];
     }
 
     /**
@@ -227,6 +306,18 @@ class CampaignMethodHandler implements MethodHandlerInterface
         return $eligibility;
     }
 
+    /**
+     * @param array<int|string, mixed> $phase
+     */
+    private function resolvePhaseName(int|string $index, array $phase): string
+    {
+        $defaultName = is_string($index) && $index !== ''
+            ? "phase_{$index}"
+            : 'phase_' . ((is_int($index) ? $index : 0) + 1);
+
+        return $this->optionalString($phase['name'] ?? null) ?? $defaultName;
+    }
+
     private function resolvePhaseRules(mixed $rules, string $phaseName): RuleSet
     {
         if ($rules instanceof RuleSet) {
@@ -245,7 +336,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
     private function resolveRandom(array $options): RandomGeneratorInterface
     {
         if (array_key_exists('seed', $options)) {
-            return new SeededRandomGenerator($this->intValue($options['seed'], 0));
+            return new SeededRandomGenerator($this->intValue($options['seed'], 0, 'options.seed'));
         }
 
         return $this->random;
@@ -269,21 +360,37 @@ class CampaignMethodHandler implements MethodHandlerInterface
         if (!is_array($phasesRaw) || $phasesRaw === []) {
             throw new ValidationException('options.phases is required and must be a non-empty array for campaign.batch.');
         }
+        DrawValidator::assertCountAtMost($phasesRaw, self::MAX_PHASES, 'options.phases');
 
-        $withExplain = $this->boolValue($options['withExplain'] ?? false);
-        $retryLimit = max(1, $this->intValue($options['retryLimit'] ?? null, 100));
+        $preparedPhases = [];
+        $phaseNames = [];
+        $requestedCount = 0;
+        foreach ($phasesRaw as $index => $phaseRaw) {
+            $phase = $this->prepareBatchPhase($index, $phaseRaw, $defaultRules, $random);
+            if (isset($phaseNames[$phase['name']])) {
+                throw new ValidationException("Campaign phase name '{$phase['name']}' must be unique.");
+            }
+            $phaseNames[$phase['name']] = true;
+            $preparedPhases[] = $phase;
+            $requestedCount += $this->sumItemCounts($phase['items']);
+            if ($requestedCount > self::MAX_TOTAL_SLOTS) {
+                throw new ValidationException('The total campaign batch slot count exceeds 100000.');
+            }
+        }
+
+        $withExplain = $this->boolValue($options['withExplain'] ?? false, 'options.withExplain');
+        $retryLimit = $this->intValue($options['retryLimit'] ?? null, 100, 'options.retryLimit');
+        DrawValidator::assertPositiveIntWithin($retryLimit, self::MAX_TOTAL_SLOTS, 'options.retryLimit');
+        $this->assertEvaluationBudget($requestedCount, count($users));
         $phaseResults = [];
 
-        foreach ($phasesRaw as $index => $phaseRaw) {
+        foreach ($preparedPhases as $preparedPhase) {
             $phase = $this->runBatchPhase(
-                index: $index,
-                phaseRaw: $phaseRaw,
+                phase: $preparedPhase,
                 users: $users,
-                defaultRules: $defaultRules,
                 auditSecret: $auditSecret,
                 eligibility: $eligibility,
                 cachePool: $cachePool,
-                random: $random,
                 withExplain: $withExplain,
             );
             $phaseResults[$phase['name']] = $phase['result'];
@@ -310,7 +417,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
             'campaign.batch',
             $entries,
             $raw,
-            $this->sumPhaseCounts($phasesRaw),
+            $requestedCount,
             [
                 'phaseCount' => count($phasesRaw),
                 'withExplain' => $withExplain,
@@ -322,37 +429,27 @@ class CampaignMethodHandler implements MethodHandlerInterface
     }
 
     /**
+     * @param array{
+     *   name: string,
+     *   items: array<string, array{count: int, weight: float, group: ?string}>,
+     *   rules: RuleSet,
+     *   random: RandomGeneratorInterface
+     * } $phase
      * @param list<string> $users
      * @return array{name: string, result: array<string, mixed>}
      */
     private function runBatchPhase(
-        int|string $index,
-        mixed $phaseRaw,
+        array $phase,
         array $users,
-        RuleSet $defaultRules,
         string $auditSecret,
         ?callable $eligibility,
         CacheItemPoolInterface $cachePool,
-        RandomGeneratorInterface $random,
         bool $withExplain,
     ): array {
-        if (!is_array($phaseRaw)) {
-            throw new ValidationException("Phase at index {$index} must be an array.");
-        }
-
-        $defaultPhaseName = is_string($index) && $index !== ''
-            ? "phase_{$index}"
-            : 'phase_' . ((is_int($index) ? $index : 0) + 1);
-        $phaseName = $this->optionalString($phaseRaw['name'] ?? null) ?? $defaultPhaseName;
-        if (!array_key_exists('items', $phaseRaw) || !is_array($phaseRaw['items'])) {
-            throw new ValidationException("Phase '{$phaseName}' must define items.");
-        }
-
-        $phaseItems = $this->normalizeItems($phaseRaw['items']);
-        $phaseRules = $this->resolvePhaseRules($phaseRaw['rules'] ?? $defaultRules, $phaseName);
-        $phaseRandom = array_key_exists('seed', $phaseRaw)
-            ? new SeededRandomGenerator($this->intValue($phaseRaw['seed'], 0))
-            : $random;
+        $phaseName = $phase['name'];
+        $phaseItems = $phase['items'];
+        $phaseRules = $phase['rules'];
+        $phaseRandom = $phase['random'];
 
         $engine = new CampaignEngine($phaseRules, $cachePool, $phaseRandom, $eligibility, $withExplain);
         $phaseResult = $engine->run($users, $phaseItems);
@@ -389,8 +486,10 @@ class CampaignMethodHandler implements MethodHandlerInterface
         CacheItemPoolInterface $cachePool,
         RandomGeneratorInterface $random,
     ): array {
-        $withExplain = $this->boolValue($options['withExplain'] ?? false);
-        $retryLimit = max(1, $this->intValue($options['retryLimit'] ?? null, 100));
+        $withExplain = $this->boolValue($options['withExplain'] ?? false, 'options.withExplain');
+        $retryLimit = $this->intValue($options['retryLimit'] ?? null, 100, 'options.retryLimit');
+        DrawValidator::assertPositiveIntWithin($retryLimit, self::MAX_TOTAL_SLOTS, 'options.retryLimit');
+        $this->assertEvaluationBudget($this->sumItemCounts($items), count($users));
 
         $engine = new CampaignEngine($rules, $cachePool, $random, $eligibility, $withExplain);
         $raw = $engine->run($users, $items);
@@ -431,6 +530,38 @@ class CampaignMethodHandler implements MethodHandlerInterface
     /**
      * @param list<string> $users
      * @param array<string, array{count: int, weight: float, group: ?string}> $items
+     * @return array{0: array<string, int>, 1: array<string, int>}
+     */
+    private function runSimulationIterations(
+        array $users,
+        array $items,
+        RuleSet $rules,
+        ?callable $eligibility,
+        int $iterations,
+        int $seedBase,
+    ): array {
+        $userWins = array_fill_keys($users, 0);
+        $itemWins = array_fill_keys(array_keys($items), 0);
+
+        for ($i = 1; $i <= $iterations; $i++) {
+            $random = new SeededRandomGenerator($seedBase + $i);
+            $engine = new CampaignEngine($rules, new MemoryCachePool(), $random, $eligibility, false);
+            $result = $engine->run($users, $items)['winners'];
+
+            foreach ($result as $item => $winners) {
+                $itemWins[$item] += count($winners);
+                foreach ($winners as $winner) {
+                    $userWins[$winner]++;
+                }
+            }
+        }
+
+        return [$userWins, $itemWins];
+    }
+
+    /**
+     * @param list<string> $users
+     * @param array<string, array{count: int, weight: float, group: ?string}> $items
      * @param array<string, mixed> $options
      * @return array<string, mixed>
      */
@@ -441,55 +572,33 @@ class CampaignMethodHandler implements MethodHandlerInterface
         array $options,
         ?callable $eligibility,
     ): array {
-        $iterations = max(1, $this->intValue($options['iterations'] ?? null, 1000));
-        $retryLimit = max(1, $this->intValue($options['retryLimit'] ?? null, 100));
-        $seedBase = $this->intValue($options['seed'] ?? null, 0);
+        $iterations = $this->intValue($options['iterations'] ?? null, 1000, 'options.iterations');
+        DrawValidator::assertPositiveIntWithin($iterations, self::MAX_ITERATIONS, 'options.iterations');
+        $retryLimit = $this->intValue($options['retryLimit'] ?? null, 100, 'options.retryLimit');
+        DrawValidator::assertPositiveIntWithin($retryLimit, self::MAX_TOTAL_SLOTS, 'options.retryLimit');
+        $seedBase = $this->intValue($options['seed'] ?? null, 0, 'options.seed');
+        if ($seedBase > PHP_INT_MAX - $iterations) {
+            throw new ValidationException('options.seed is too large for the requested iteration count.');
+        }
 
-        $userWins = [];
-        foreach ($users as $user) {
-            $userWins[$user] = 0;
-        }
-        $itemWins = [];
-        foreach (array_keys($items) as $itemId) {
-            $itemWins[$itemId] = 0;
-        }
         $totalSlotsPerIteration = $this->sumItemCounts($items);
-
-        for ($i = 1; $i <= $iterations; $i++) {
-            $iterationRandom = new SeededRandomGenerator($seedBase + $i);
-            $engine = new CampaignEngine($rules, new MemoryCachePool(), $iterationRandom, $eligibility, false);
-            $result = $engine->run($users, $items)['winners'];
-
-            foreach ($result as $item => $winners) {
-                $itemWins[$item] += count($winners);
-                foreach ($winners as $winner) {
-                    $userWins[$winner] = ($userWins[$winner] ?? 0) + 1;
-                }
-            }
+        if ($totalSlotsPerIteration > 0 && $iterations > intdiv(PHP_INT_MAX, $totalSlotsPerIteration)) {
+            throw new ValidationException('The simulation workload exceeds the supported integer range.');
         }
+        $this->assertEvaluationBudget($totalSlotsPerIteration, count($users), $iterations);
 
-        $totalSlots = max(1, $totalSlotsPerIteration * $iterations);
-        $userDistribution = [];
-        foreach ($userWins as $user => $wins) {
-            $rate = $wins / $totalSlots;
-            $margin = 1.96 * sqrt(($rate * (1 - $rate)) / $totalSlots);
-            $userDistribution[$user] = [
-                'wins' => $wins,
-                'rate' => $rate,
-                'ci95' => [
-                    'low' => max(0.0, $rate - $margin),
-                    'high' => min(1.0, $rate + $margin),
-                ],
-            ];
-        }
+        [$userWins, $itemWins] = $this->runSimulationIterations(
+            users: $users,
+            items: $items,
+            rules: $rules,
+            eligibility: $eligibility,
+            iterations: $iterations,
+            seedBase: $seedBase,
+        );
 
-        $itemDistribution = [];
-        foreach ($itemWins as $item => $wins) {
-            $itemDistribution[$item] = [
-                'wins' => $wins,
-                'avgPerIteration' => $wins / $iterations,
-            ];
-        }
+        $totalSlots = $totalSlotsPerIteration * $iterations;
+        $userDistribution = $this->userDistribution($userWins, $totalSlots);
+        $itemDistribution = $this->itemDistribution($itemWins, $iterations);
 
         $raw = [
             'iterations' => $iterations,
@@ -512,7 +621,7 @@ class CampaignMethodHandler implements MethodHandlerInterface
             'campaign.simulate',
             $entries,
             $raw,
-            $iterations,
+            count($entries),
             [
                 'iterations' => $iterations,
                 'retryLimit' => $retryLimit,
@@ -523,20 +632,16 @@ class CampaignMethodHandler implements MethodHandlerInterface
     }
 
     /**
-     * @param array<int|string, mixed>|array<string, array{count: int, weight: float, group: ?string}> $items
+     * @param array<string, array{count: int, weight: float, group: ?string}> $items
      */
     private function sumItemCounts(array $items): int
     {
         $sum = 0;
         foreach ($items as $item) {
-            if (is_int($item)) {
-                $sum += max(0, $item);
-
-                continue;
+            if ($item['count'] > self::MAX_TOTAL_SLOTS - $sum) {
+                throw new ValidationException('The total campaign slot count exceeds 100000.');
             }
-            if (is_array($item)) {
-                $sum += max(0, $this->intValue($item['count'] ?? null, 1));
-            }
+            $sum += $item['count'];
         }
 
         return $sum;
@@ -569,22 +674,25 @@ class CampaignMethodHandler implements MethodHandlerInterface
     }
 
     /**
-     * @param array<int|string, mixed> $phases
+     * @param array<string, int> $userWins
+     * @return array<string, array{wins: int, rate: float, ci95: array{low: float, high: float}}>
      */
-    private function sumPhaseCounts(array $phases): int
+    private function userDistribution(array $userWins, int $totalSlots): array
     {
-        $sum = 0;
-        foreach ($phases as $phase) {
-            if (!is_array($phase)) {
-                continue;
-            }
-            $items = $phase['items'] ?? [];
-            if (!is_array($items)) {
-                continue;
-            }
-            $sum += $this->sumItemCounts($items);
+        $distribution = [];
+        foreach ($userWins as $user => $wins) {
+            $rate = $totalSlots === 0 ? 0.0 : $wins / $totalSlots;
+            $margin = $totalSlots === 0 ? 0.0 : 1.96 * sqrt(($rate * (1 - $rate)) / $totalSlots);
+            $distribution[$user] = [
+                'wins' => $wins,
+                'rate' => $rate,
+                'ci95' => [
+                    'low' => max(0.0, $rate - $margin),
+                    'high' => min(1.0, $rate + $margin),
+                ],
+            ];
         }
 
-        return $sum;
+        return $distribution;
     }
 }

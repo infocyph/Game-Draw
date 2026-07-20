@@ -64,6 +64,8 @@ Current rule engine stores counters/values under keys like:
 - `rules.group_wins.{group}`
 - `rules.user_last_win.{userId}`
 
+Identifiers that contain PSR-6 reserved characters or would exceed the portable key length are encoded with a domain-separated SHA-256 key. Safe existing identifiers keep the patterns above for backward compatibility.
+
 Persistence Guidance
 --------------------
 

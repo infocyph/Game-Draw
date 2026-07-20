@@ -68,7 +68,7 @@ Options
 -------
 
 - `count` (int, default `1`): number of picks
-- `check` (bool, default `true`): enforce strict payload validation
+- `check` (bool, default `true`): compatibility option; payload validation is always enforced
 
 Example
 -------

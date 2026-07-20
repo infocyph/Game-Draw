@@ -40,6 +40,7 @@ Audit Fields
 
 The audit object contains:
 
+- `version`
 - `generatedAt`
 - `configHash`
 - `resultHash`
@@ -51,8 +52,10 @@ The audit object contains:
 Signature Behavior
 ------------------
 
-- If `secret` is provided, signature uses `hmac-sha256`.
-- If no `secret` is provided, signature uses `sha256`.
+- Version 2 uses SHA-256 for configuration, result, request, and seed fingerprints.
+- If `secret` is provided, the signature uses domain-separated `hmac-sha256`.
+- If no `secret` is provided, `sha256` provides corruption detection but not authenticity.
+- `verify()` remains compatible with unversioned artifacts created by earlier releases.
 
 Request Fingerprinting
 ----------------------

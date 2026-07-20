@@ -56,7 +56,12 @@ final class WeightTools
         }
 
         if (stripos($rawWeight, 'e') !== false) {
-            $rawWeight = rtrim(rtrim(sprintf('%.20F', (float) $rawWeight), '0'), '.');
+            $numeric = (float) $rawWeight;
+            if (!is_finite($numeric)) {
+                throw new ValidationException('Weight must be finite.');
+            }
+
+            $rawWeight = rtrim(rtrim(sprintf('%.20F', $numeric), '0'), '.');
             if ($rawWeight === '') {
                 return '0';
             }
@@ -76,10 +81,6 @@ final class WeightTools
     {
         if (is_int($value) || is_float($value)) {
             return (float) $value;
-        }
-
-        if (!is_numeric($value)) {
-            throw new ValidationException('Weight must be numeric.');
         }
 
         return (float) self::normalizeNumericString($value);

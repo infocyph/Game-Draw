@@ -19,7 +19,7 @@ Shared Options
 --------------
 
 - `count` (int, default `1`)
-- `check` (bool, default `true`)
+- `check` (bool, default `true`): compatibility option; validation cannot be disabled
 
 Additional option:
 

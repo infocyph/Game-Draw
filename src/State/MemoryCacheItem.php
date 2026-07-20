@@ -28,7 +28,7 @@ final class MemoryCacheItem implements CacheItemInterface
 
         $now = new DateTimeImmutable();
         if (is_int($time)) {
-            $this->expiresAt = $now->modify("+{$time} seconds");
+            $this->expiresAt = $now->modify("{$time} seconds");
 
             return $this;
         }

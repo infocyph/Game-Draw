@@ -5,42 +5,35 @@ declare(strict_types=1);
 namespace Infocyph\Draw\Flexible;
 
 use Infocyph\Draw\Contracts\RandomGeneratorInterface;
-use Infocyph\Draw\Exceptions\EmptyPoolException;
 use Infocyph\Draw\Exceptions\ValidationException;
 
 class BatchedDraw
 {
-    public function __construct(private readonly RandomGeneratorInterface $random) {}
+    private const MAX_DRAW_COUNT = 100_000;
+
+    private readonly EliminationDraw $elimination;
+
+    public function __construct(private readonly RandomGeneratorInterface $random)
+    {
+        $this->elimination = new EliminationDraw($random);
+    }
 
     /**
      * @return list<string>
      */
     public function draw(FlexibleState $state, int $count, bool $withReplacement): array
     {
-        if ($count <= 0) {
-            throw new ValidationException('Count must be a positive integer.');
+        if ($count <= 0 || $count > self::MAX_DRAW_COUNT) {
+            throw new ValidationException('Count must be between 1 and 100000.');
         }
 
         $pickedItems = [];
-        for ($i = 0; $i < $count && !empty($state->items); $i++) {
+        for ($i = 0; $i < $count && $state->items !== []; $i++) {
             $pickedItems[] = $withReplacement
                 ? $state->itemName($this->random->pickArrayKey($state->items))
-                : $this->pickWithoutReplacement($state);
+                : $this->elimination->draw($state);
         }
 
         return $pickedItems;
-    }
-
-    private function pickWithoutReplacement(FlexibleState $state): string
-    {
-        if (empty($state->items)) {
-            throw new EmptyPoolException('No items left to draw.');
-        }
-
-        $index = $this->random->pickArrayKey($state->items);
-        $pickedItem = $state->itemName($index);
-        $state->removeItem($index);
-
-        return $pickedItem;
     }
 }

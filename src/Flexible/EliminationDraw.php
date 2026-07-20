@@ -13,10 +13,14 @@ class EliminationDraw
 
     public function draw(FlexibleState $state): string
     {
-        if (empty($state->items)) {
+        if ($state->items === []) {
             throw new EmptyPoolException('No items left to draw.');
         }
 
-        return (new BatchedDraw($this->random))->draw($state, 1, false)[0];
+        $index = $this->random->pickArrayKey($state->items);
+        $pickedItem = $state->itemName($index);
+        $state->removeItem($index);
+
+        return $pickedItem;
     }
 }

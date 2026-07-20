@@ -15,7 +15,6 @@
     ],
     "require": {
         "php": ">=8.2",
-        "ext-bcmath": "*",
         "psr/cache": "^3.0"
     },
     "require-dev": {

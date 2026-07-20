@@ -17,8 +17,6 @@ Campaign state uses PSR-6 (`Psr\Cache\CacheItemPoolInterface`) via `options.cach
 Requirements:
 
 - PHP 8.2+
-- `ext-bcmath`
-
 ```bash
 composer require infocyph/game-draw
 ```

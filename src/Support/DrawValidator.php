@@ -8,6 +8,16 @@ use Infocyph\Draw\Exceptions\ValidationException;
 
 final class DrawValidator
 {
+    /**
+     * @param array<mixed> $values
+     */
+    public static function assertCountAtMost(array $values, int $maximum, string $field): void
+    {
+        if (count($values) > $maximum) {
+            throw new ValidationException("{$field} cannot contain more than {$maximum} entries.");
+        }
+    }
+
     public static function assertNonNegativeInt(mixed $value, string $field): void
     {
         if (!is_int($value) || $value < 0) {
@@ -27,7 +37,7 @@ final class DrawValidator
      */
     public static function assertNotEmpty(array $values, string $message): void
     {
-        if (empty($values)) {
+        if ($values === []) {
             throw new ValidationException($message);
         }
     }
@@ -36,6 +46,13 @@ final class DrawValidator
     {
         if (!is_numeric($value)) {
             throw new ValidationException("{$field} must be numeric.");
+        }
+    }
+
+    public static function assertPositiveIntWithin(int $value, int $maximum, string $field): void
+    {
+        if ($value < 1 || $value > $maximum) {
+            throw new ValidationException("{$field} must be between 1 and {$maximum}.");
         }
     }
 
@@ -65,7 +82,7 @@ final class DrawValidator
             }
 
             $missingKeys = array_diff_key($requiredKeys, $item);
-            if (!empty($missingKeys)) {
+            if ($missingKeys !== []) {
                 throw new ValidationException(
                     "{$context} at index {$index} is missing required keys: " . implode(', ', array_keys($missingKeys)),
                 );
@@ -76,12 +93,18 @@ final class DrawValidator
     private static function numericValue(mixed $value, string $field): float
     {
         if (is_int($value) || is_float($value)) {
-            return (float) $value;
+            $numeric = (float) $value;
+            if (is_finite($numeric)) {
+                return $numeric;
+            }
         }
         if (is_string($value) && is_numeric($value)) {
-            return (float) $value;
+            $numeric = (float) $value;
+            if (is_finite($numeric)) {
+                return $numeric;
+            }
         }
 
-        throw new ValidationException("{$field} must be numeric.");
+        throw new ValidationException("{$field} must be a finite numeric value.");
     }
 }

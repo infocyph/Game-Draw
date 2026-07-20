@@ -4,8 +4,7 @@ Installation
 Requirements
 ------------
 
-- PHP 8.4+
-- `ext-bcmath`
+- PHP 8.2+
 
 Package dependencies include PSR-6 cache interfaces (`psr/cache`) for campaign state handling.
 

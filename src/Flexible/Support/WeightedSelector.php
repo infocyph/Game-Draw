@@ -19,6 +19,19 @@ final class WeightedSelector
         string $exhaustedMessage = 'Draw failed unexpectedly.',
     ): int {
         [$weights, $totalWeight] = WeightTools::prepare($weightsInput);
+
+        return self::pickPrepared($random, $weights, $totalWeight, $exhaustedMessage);
+    }
+
+    /**
+     * @param array<int, array{index: int, weight: int}> $weights
+     */
+    public static function pickPrepared(
+        RandomGeneratorInterface $random,
+        array $weights,
+        int $totalWeight,
+        string $exhaustedMessage = 'Draw failed unexpectedly.',
+    ): int {
         if ($totalWeight <= 0) {
             throw new ValidationException('Total weight must be greater than zero.');
         }

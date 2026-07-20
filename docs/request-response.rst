@@ -41,11 +41,11 @@ Method Option Matrix
 
 `lucky`
    - `options.count` (default `1`)
-   - `options.check` (default `true`)
+   - `options.check` (boolean compatibility option; validation is always enforced)
 
 Flexible item methods
    - `options.count` (default `1`)
-   - `options.check` (default `true`)
+   - `options.check` (boolean compatibility option; validation is always enforced)
    - `options.withReplacement` (`batched` only, default `false`)
 
 `grand`

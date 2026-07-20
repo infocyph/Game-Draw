@@ -13,12 +13,9 @@ class WeightedEliminationDraw
 
     public function draw(FlexibleState $state): string
     {
-        $weightsInput = [];
-        foreach (array_keys($state->items) as $index) {
-            $weightsInput[] = ['weight' => $state->itemWeight($index)];
-        }
+        [$weights, $totalWeight] = $state->preparedItemWeights();
 
-        $index = WeightedSelector::pickIndex($this->random, $weightsInput);
+        $index = WeightedSelector::pickPrepared($this->random, $weights, $totalWeight);
         $pickedItem = $state->itemName($index);
         $state->removeItem($index);
 
